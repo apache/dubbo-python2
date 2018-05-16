@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from StringIO import StringIO
-
 from common.constants import response_status_message
 from common.util import *
 
@@ -8,6 +6,7 @@ from common.util import *
 class Response(object):
     def __init__(self, data):
         self.__data = data
+        self.__result = {}  # 用于保存最终结果
 
     def get_byte(self):
         return self.__data[0]
@@ -58,7 +57,7 @@ class Response(object):
         elif value == 0x5c:
             result = 1.0
         elif value == 0x5d:
-            result = float(byte_list_2_num(self.read_byte()))
+            result = float(byte_list_2_num(self.read_bytes(1)))
         elif value == 0x5e:
             result = float(byte_list_2_num(self.read_bytes(2)))
         elif value == 0x5f:
@@ -67,26 +66,28 @@ class Response(object):
             result = byte_list_2_num(self.read_bytes(8))
         return result
 
-    def __read_utf(self, output, length):
+    def __read_utf(self, length):
+        value = []
         while length > 0:
             c = self.read_byte()
-            output.write(chr(c))
+            value.append(c)
             if c < 0x80:
                 pass
             elif (c & 0xe0) == 0xc0:
-                output.write(self.read_bytes(1))
+                value.extend(self.read_bytes(1))
             elif (c & 0xf0) == 0xe0:
-                output.write(self.read_bytes(2))
+                value.extend(self.read_bytes(2))
             elif (c & 0xf8) == 0xf0:
-                output.write(self.read_bytes(3))
+                value.extend(self.read_bytes(3))
             length -= 1
+        return value
 
     def read_string(self):
         value = self.read_byte()
-        buf = StringIO()
+        buf = []
         while value == 0x52:
             length = byte_list_2_num(self.read_bytes(2))
-            self.__read_utf(buf, length)
+            buf.extend(self.__read_utf(length))
             value = self.read_byte()
 
         if value == ord('S'):
@@ -96,9 +97,8 @@ class Response(object):
         else:
             length = (value - 0x30) << 8 | self.read_byte()
 
-        self.__read_utf(buf, length)
-        result = buf.getvalue().decode('utf-8')
-        return result
+        buf.extend(self.__read_utf(length))
+        return str(bytearray(buf))
 
     def read_object(self):
         if not ord('C') == self.read_byte():
@@ -114,7 +114,17 @@ class Response(object):
         print field_names
 
         what_the_fuck = self.read_byte()
+        self.read_next()
 
+    def read_list(self):
+        length = self.read_byte()
+        self.read_next()
+
+    def read_next(self):
+        """
+        读取下一个变量，自动识别变量类型
+        :return:
+        """
         while self.length() > 0:
             data_type = self.get_byte()
             if data_type == ord('T') or data_type == ord('F'):
@@ -126,7 +136,13 @@ class Response(object):
             elif 0x00 <= data_type <= 0x1f or data_type == ord('S'):
                 print self.read_string()
             elif data_type == ord('C'):
-                print self.read_object()
+                self.read_object()
+            elif 0x78 <= data_type <= 0x7f:
+                self.read_list()
+            elif data_type == ord('a'):
+                what_the_fuck = self.read_byte()
+            else:
+                raise Exception('Unknown param type.')
 
     def __repr__(self):
         return str(self.__data)
@@ -148,9 +164,4 @@ def get_response_body_length(response_head):
 
 
 if __name__ == '__main__':
-    data = 0x9143186d652e686f757275692e6563686f2e6265616e2e5573657294036167650673616c61727909677261647561746564046e616d6560a25e07d04643186d652e686f757275692e6563686f2e6265616e2e4e616d65920966697273744e616d65086c6173744e616d656101e5bca001e4b889
-    r = Response(num_2_byte_list(data))
-    print r.read_int()
-
-    while r.length() > 0:
-        print r.read_object()
+    pass
