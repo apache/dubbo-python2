@@ -24,7 +24,7 @@ def call(dubbo_version='2.4.10', version='1.0.0', path=None, method=None, argume
     response_body = client.read(response_body_length)
     res = Response(response_body)
     res.read_int()  # 响应的状态
-    res.read_object()
+    print res.read_object()
 
 
 if __name__ == '__main__':
