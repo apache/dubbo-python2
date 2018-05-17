@@ -6,6 +6,8 @@ from common.util import *
 class Response(object):
     def __init__(self, data):
         self.__data = data
+        self.types = []  # 保存所有通过read_type解析出来的type
+        self.ref = []  # 引用类型
         self.__result = {}  # 用于保存最终结果
 
     def get_byte(self):
@@ -66,7 +68,7 @@ class Response(object):
             result = byte_list_2_num(self.read_bytes(8))
         return result
 
-    def __read_utf(self, length):
+    def _read_utf(self, length):
         value = []
         while length > 0:
             c = self.read_byte()
@@ -87,7 +89,7 @@ class Response(object):
         buf = []
         while value == 0x52:
             length = byte_list_2_num(self.read_bytes(2))
-            buf.extend(self.__read_utf(length))
+            buf.extend(self._read_utf(length))
             value = self.read_byte()
 
         if value == ord('S'):
@@ -97,52 +99,87 @@ class Response(object):
         else:
             length = (value - 0x30) << 8 | self.read_byte()
 
-        buf.extend(self.__read_utf(length))
+        buf.extend(self._read_utf(length))
         return str(bytearray(buf))
 
     def read_object(self):
-        if not ord('C') == self.read_byte():
-            raise Exception('This is not a object')
+        value = self.read_byte()
+        if 0x60 <= value <= 0x6f:
+            ref = value - 0x60
+            field_length = self.ref[ref]
+            for i in range(field_length):
+                param_value = self.read_string()
+                print param_value
+        elif value == ord('C'):
+            path = self.read_string()
+            print path
 
-        path = self.read_string()
-        print path
+            field_length = self.read_int()
+            # 由于Java中的类型在Python中不再有意义，所以此处我们只需要引用类型的变量数量
+            self.ref.append(field_length)
 
-        field_length = self.read_int()
-        field_names = []
-        for i in range(field_length):
-            field_names.append(self.read_string())
-        print field_names
+            field_names = []
+            for i in range(field_length):
+                field_names.append(self.read_string())
+            print field_names
 
-        what_the_fuck = self.read_byte()
-        self.read_next()
+            what_the_fuck = self.read_byte()
+
+            for i in range(field_length):
+                self.read_next()
+
+    def read_type(self):
+        value = self.read_byte()
+        if value == 0x52 or value == ord('S') or (0x00 <= value <= 0x1f) or (0x30 <= value <= 0x33):
+            _type = self.read_string()
+            self.types.append(_type)
+            return _type
+        else:
+            ref = self.read_int()
+            return self.types[ref]
 
     def read_list(self):
-        length = self.read_byte()
-        self.read_next()
+        value = self.read_byte()
+        if 0x70 <= value <= 0x77:
+            _type = self.read_type()
+            length = value - 0x70
+        elif 0x78 <= value <= 0x7f:
+            length = value - 0x78
+            for i in range(length):
+                self.read_object()
+        elif value == 0x55:
+            _type = self.read_type()
+        elif value == 0x56:
+            _type = self.read_type()
+            lenght = self.read_int()
+        elif value == 0x57:
+            pass
+        elif value == 0x58:
+            length = self.read_int()
 
     def read_next(self):
         """
         读取下一个变量，自动识别变量类型
         :return:
         """
-        while self.length() > 0:
-            data_type = self.get_byte()
-            if data_type == ord('T') or data_type == ord('F'):
-                print self.read_boolean()
-            elif 0x80 <= data_type <= 0xd7 or data_type == ord('I'):
-                print self.read_int()
-            elif 0x5b <= data_type <= 0x5f or data_type == ord('D'):
-                print self.read_double()
-            elif 0x00 <= data_type <= 0x1f or data_type == ord('S'):
-                print self.read_string()
-            elif data_type == ord('C'):
-                self.read_object()
-            elif 0x78 <= data_type <= 0x7f:
-                self.read_list()
-            elif data_type == ord('a'):
-                what_the_fuck = self.read_byte()
-            else:
-                raise Exception('Unknown param type.')
+        if self.length() <= 0:
+            return
+
+        data_type = self.get_byte()
+        if data_type == ord('T') or data_type == ord('F'):
+            print self.read_boolean()
+        elif 0x80 <= data_type <= 0xd7 or data_type == ord('I'):
+            print self.read_int()
+        elif 0x5b <= data_type <= 0x5f or data_type == ord('D'):
+            print self.read_double()
+        elif 0x00 <= data_type <= 0x1f or data_type == ord('S'):
+            print self.read_string()
+        elif 0x60 <= data_type <= 0x6f or data_type == ord('C'):
+            self.read_object()
+        elif 0x70 <= data_type <= 0x7f or 0x55 <= data_type <= 0x58:
+            self.read_list()
+        else:
+            raise Exception('Unknown param type.')
 
     def __repr__(self):
         return str(self.__data)
