@@ -4,29 +4,67 @@ from common.util import *
 
 
 class Response(object):
+    """
+    A class for parsing dubbo response body.
+    All types can be parsed:
+    * byte
+    * boolean
+    * int
+    * double
+    * string
+    * object
+    * list
+    * map
+    * null
+
+    * type
+    """
+
     def __init__(self, data):
-        self.__data = data
+        self.__data = data  # data是字节数组
+        self.__index = 0  # 当前索引的位置
+
         self.types = []  # 保存所有通过read_type解析出来的type
-        self.ref = []  # 引用类型
-        self.__result = {}  # 用于保存最终结果
+        self.ref = []  # 保存所有引用类型的所有字段名称
 
     def get_byte(self):
-        return self.__data[0]
+        """
+        获取到头部的字节数据，只是获取并不是移动指针
+        :return:
+        """
+        return self.__data[self.__index]
 
     def length(self):
-        return len(self.__data)
+        """
+        当前的字节长度
+        :return:
+        """
+        return len(self.__data) - self.__index
 
     def read_byte(self):
-        value = self.__data[0]
-        del self.__data[0]
+        """
+        读取一个字节并向后移动一位指针
+        :return:
+        """
+        value = self.__data[self.__index]
+        self.__index += 1
         return value
 
     def read_bytes(self, num):
-        value = self.__data[:num]
-        del self.__data[:num]
+        """
+        读取n个字节并向后移动n位指针
+        :param num:
+        :return:
+        """
+        value = self.__data[self.__index:self.__index + num]
+        self.__index += num
         return value
 
     def read_boolean(self):
+        """
+        读取一个布尔类型
+        :return:
+        """
         value = self.read_byte()
         if value == ord('T'):
             return True
@@ -36,6 +74,10 @@ class Response(object):
             raise Exception('illegal boolean value: {0}'.format(value))
 
     def read_int(self):
+        """
+        读取一个整型数据
+        :return:
+        """
         value = self.read_byte()
         if 0x80 <= value <= 0xbf:
             result = value - 0x90
@@ -53,6 +95,10 @@ class Response(object):
         return result
 
     def read_double(self):
+        """
+        读取一个浮点类型
+        :return:
+        """
         value = self.read_byte()
         if value == 0x5b:
             result = 0.0
@@ -69,6 +115,11 @@ class Response(object):
         return result
 
     def _read_utf(self, length):
+        """
+        读取n个字符
+        :param length:
+        :return:
+        """
         value = []
         while length > 0:
             c = self.read_byte()
@@ -85,6 +136,10 @@ class Response(object):
         return value
 
     def read_string(self):
+        """
+        读取一个字符串
+        :return:
+        """
         value = self.read_byte()
         buf = []
         while value == 0x52:
@@ -103,6 +158,10 @@ class Response(object):
         return str(bytearray(buf))
 
     def read_object(self):
+        """
+        读取一个对象
+        :return:
+        """
         result = {}
 
         value = self.read_byte()
@@ -131,6 +190,10 @@ class Response(object):
         return result
 
     def read_type(self):
+        """
+        读取一个type
+        :return:
+        """
         value = self.read_byte()
         if value == 0x52 or value == ord('S') or (0x00 <= value <= 0x1f) or (0x30 <= value <= 0x33):
             _type = self.read_string()
@@ -141,6 +204,10 @@ class Response(object):
             return self.types[ref]
 
     def read_list(self):
+        """
+        读取一个列表
+        :return:
+        """
         result = []
 
         value = self.read_byte()
@@ -150,7 +217,7 @@ class Response(object):
         elif 0x78 <= value <= 0x7f:
             length = value - 0x78
             for i in range(length):
-                result.append(self.read_object())
+                result.append(self.read_next())
         elif value == 0x55:
             _type = self.read_type()
         elif value == 0x56:
@@ -162,6 +229,44 @@ class Response(object):
             length = self.read_int()
 
         return result
+
+    def read_long(self):
+        value = self.read_byte()
+        if 0xd8 <= value <= 0xef:
+            result = value - 0xe0
+        elif 0xf0 <= value <= 0xff:
+            result = ((value - 0xf8) << 8) | self.read_byte()
+        elif 0x38 <= value <= 0x3f:
+            i = (value - 0x3c) << 16
+            i |= self.read_byte() << 8
+            i |= self.read_byte()
+            result = i
+        elif value == 0x59:
+            result = byte_list_2_num(self.read_bytes(4))
+        else:
+            result = byte_list_2_num(self.read_bytes(8))
+        return result
+
+    def read_null(self):
+        value = self.read_byte()
+        if value == ord('N'):
+            return None
+        else:
+            raise Exception('{0} is not null'.format(value))
+
+    def read_map(self):
+        value = self.read_byte()
+
+        if value == ord('M') or value == ord('H'):
+            result = {}
+            while self.get_byte() != ord('Z'):
+                key = self.read_next()
+                value = self.read_next()
+                result[key] = value
+            self.read_byte()  # 干掉最后一个'Z'字符
+            return result
+        else:
+            raise Exception('{0} is not a map.'.format(value))
 
     def read_next(self):
         """
@@ -175,12 +280,19 @@ class Response(object):
             return self.read_int()
         elif 0x5b <= data_type <= 0x5f or data_type == ord('D'):
             return self.read_double()
+        elif 0xd8 <= data_type <= 0xff or 0x38 <= data_type <= 0x3f \
+                or data_type == 0x59 or data_type == ord('L'):
+            return self.read_long()
         elif 0x00 <= data_type <= 0x1f or data_type == ord('S'):
             return self.read_string()
         elif 0x60 <= data_type <= 0x6f or data_type == ord('C'):
             return self.read_object()
         elif 0x70 <= data_type <= 0x7f or 0x55 <= data_type <= 0x58:
             return self.read_list()
+        elif data_type in (ord('H'), ord('M')):
+            return self.read_map()
+        elif data_type == ord('N'):
+            return self.read_null()
         else:
             raise Exception('Unknown param type.')
 
