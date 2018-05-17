@@ -194,14 +194,26 @@ class Response(object):
         读取一个type
         :return:
         """
-        value = self.read_byte()
-        if value == 0x52 or value == ord('S') or (0x00 <= value <= 0x1f) or (0x30 <= value <= 0x33):
+        value = self.get_byte()
+        if value == 0x52 \
+                or value == ord('S') \
+                or (0x00 <= value <= 0x1f) \
+                or (0x30 <= value <= 0x33):
             _type = self.read_string()
+            if not _type:
+                raise ValueError('type string is empty')
             self.types.append(_type)
             return _type
+        elif value == ord('I') \
+                or (0x80 <= value <= 0xbf) \
+                or (0xc0 <= value <= 0xcf) \
+                or (0xd0 <= value <= 0xd7):
+            type_id = self.read_int()
+            if type_id < 0 or type_id >= len(self.types):
+                raise ValueError('type id {0} undefined'.format(type_id))
+            return self.types[type_id]
         else:
-            ref = self.read_int()
-            return self.types[ref]
+            raise ValueError('code %x is unexpected when decode type')
 
     def read_list(self):
         """
@@ -212,21 +224,29 @@ class Response(object):
 
         value = self.read_byte()
         if 0x70 <= value <= 0x77:
-            _type = self.read_type()
+            _type = self.read_type()  # type对于Python来说没有用处
             length = value - 0x70
+            for i in range(length):
+                result.append(self.read_next())
         elif 0x78 <= value <= 0x7f:
             length = value - 0x78
             for i in range(length):
                 result.append(self.read_next())
         elif value == 0x55:
             _type = self.read_type()
+            # 数组的内容为空
         elif value == 0x56:
             _type = self.read_type()
-            lenght = self.read_int()
+            length = self.read_int()
+            for i in range(length):
+                result.append(self.read_next())
         elif value == 0x57:
             pass
+            # 数组的内容为空
         elif value == 0x58:
             length = self.read_int()
+            for i in range(length):
+                result.append(self.read_next())
 
         return result
 
