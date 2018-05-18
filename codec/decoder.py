@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+from datetime import datetime
+
 from common.constants import response_status_message
 from common.util import *
 
@@ -247,6 +249,10 @@ class Response(object):
         return result
 
     def read_long(self):
+        """
+        读取一个long类型的数字
+        :return:
+        """
         value = self.read_byte()
         if 0xd8 <= value <= 0xef:
             result = value - 0xe0
@@ -266,6 +272,10 @@ class Response(object):
         return result
 
     def read_null(self):
+        """
+        读取一个None
+        :return:
+        """
         value = self.read_byte()
         if value == ord('N'):
             return None
@@ -273,6 +283,10 @@ class Response(object):
             raise Exception('{0} is not null'.format(value))
 
     def read_map(self):
+        """
+        读取一个dict
+        :return:
+        """
         value = self.read_byte()
 
         if value == ord('M') or value == ord('H'):
@@ -285,6 +299,21 @@ class Response(object):
             return result
         else:
             raise Exception('{0} is not a map.'.format(value))
+
+    def read_date(self):
+        """
+        读取一个date类型的值
+        :return:
+        """
+        value = self.read_byte()
+        if value == 0x4a:
+            timestamp = byte_list_2_num(self.read_bytes(8))
+        elif value == 0x4b:
+            timestamp = byte_list_2_num(self.read_bytes(4))
+            timestamp *= 60000
+        else:
+            raise ValueError('{0} is not date type'.format(value))
+        return datetime.fromtimestamp(timestamp / 1e3).strftime("%Y-%m-%dT%H:%M:%S+0800")
 
     def read_next(self):
         """
@@ -309,6 +338,8 @@ class Response(object):
             return self.read_list()
         elif data_type in (ord('H'), ord('M')):
             return self.read_map()
+        elif data_type in (0x4a, 0x4b):
+            return self.read_date()
         elif data_type == ord('N'):
             return self.read_null()
         else:
