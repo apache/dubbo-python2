@@ -29,7 +29,7 @@ class Response(object):
 
     def get_byte(self):
         """
-        获取到头部的字节数据，只是获取并不是移动指针
+        获取到头部的字节数据，只是获取并不移动指针
         :return:
         """
         return self.__data[self.__index]
@@ -109,9 +109,11 @@ class Response(object):
         elif value == 0x5e:
             result = float(byte_list_2_num(self.read_bytes(2)))
         elif value == 0x5f:
-            result = byte_list_2_num(self.read_bytes(4))
+            result = float(byte_list_2_num(self.read_bytes(4)) / 1000)
+        elif value == ord('D'):
+            result = struct.unpack('>d', self.read_bytes(8))[0]
         else:
-            result = byte_list_2_num(self.read_bytes(8))
+            raise ValueError('{0} is not a float'.format(value))
         return result
 
     def _read_utf(self, length):
@@ -171,6 +173,12 @@ class Response(object):
             for field_name in field_names:
                 field_value = self.read_string()
                 result[field_name] = field_value
+        elif value == ord('O'):
+            ref = self.read_int()
+            field_names = self.ref[ref]
+            for field_name in field_names:
+                field_value = self.read_string()
+                result[field_name] = field_value
         elif value == ord('C'):
             path = self.read_string()
 
@@ -194,26 +202,14 @@ class Response(object):
         读取一个type
         :return:
         """
-        value = self.get_byte()
-        if value == 0x52 \
-                or value == ord('S') \
-                or (0x00 <= value <= 0x1f) \
-                or (0x30 <= value <= 0x33):
-            _type = self.read_string()
-            if not _type:
-                raise ValueError('type string is empty')
+        _type = self.read_next()
+        if isinstance(_type, int):
+            return self.types[_type]
+        elif isinstance(_type, str):
             self.types.append(_type)
             return _type
-        elif value == ord('I') \
-                or (0x80 <= value <= 0xbf) \
-                or (0xc0 <= value <= 0xcf) \
-                or (0xd0 <= value <= 0xd7):
-            type_id = self.read_int()
-            if type_id < 0 or type_id >= len(self.types):
-                raise ValueError('type id {0} undefined'.format(type_id))
-            return self.types[type_id]
         else:
-            raise ValueError('code %x is unexpected when decode type')
+            raise Exception('Unknown _type type for value: {0}'.format(_type))
 
     def read_list(self):
         """
@@ -262,9 +258,11 @@ class Response(object):
             i |= self.read_byte()
             result = i
         elif value == 0x59:
-            result = byte_list_2_num(self.read_bytes(4))
+            result = struct.unpack('>i', self.read_bytes(4))[0]
+        elif value == ord('L'):
+            result = struct.unpack('>q', self.read_bytes(8))[0]
         else:
-            result = byte_list_2_num(self.read_bytes(8))
+            raise ValueError('{0} is not long type'.format(value))
         return result
 
     def read_null(self):
@@ -303,9 +301,9 @@ class Response(object):
         elif 0xd8 <= data_type <= 0xff or 0x38 <= data_type <= 0x3f \
                 or data_type == 0x59 or data_type == ord('L'):
             return self.read_long()
-        elif 0x00 <= data_type <= 0x1f or data_type == ord('S'):
+        elif 0x00 <= data_type <= 0x1f or 0x30 <= data_type <= 0x33 or data_type == 0x52 or data_type == ord('S'):
             return self.read_string()
-        elif 0x60 <= data_type <= 0x6f or data_type == ord('C'):
+        elif 0x60 <= data_type <= 0x6f or data_type == ord('O') or data_type == ord('C'):
             return self.read_object()
         elif 0x70 <= data_type <= 0x7f or 0x55 <= data_type <= 0x58:
             return self.read_list()

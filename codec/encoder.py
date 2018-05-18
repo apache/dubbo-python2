@@ -34,7 +34,10 @@ def _encode_request_body(body):
         if isinstance(argument, bool):  # bool类型的判断必须放在int类型判断的前面
             parameter_types += 'Z'
         elif isinstance(argument, int):
-            parameter_types += 'I'
+            if -2147483648 <= argument <= 2147483647:
+                parameter_types += 'I'
+            else:
+                parameter_types += 'J'
         elif isinstance(argument, float):
             parameter_types += 'D'
         elif isinstance(argument, str):
@@ -84,6 +87,11 @@ def _encode_single_value(value):
             result.append(ord('F'))
         return result
     elif isinstance(value, int):
+        if value > 2147483647 or value < -2147483648:
+            result.append(ord('L'))
+            result.extend(list(bytearray(struct.pack('>q', value))))
+            return result
+
         if INT_DIRECT_MIN <= value <= INT_DIRECT_MAX:
             result.append(value + BC_INT_ZERO)
         elif INT_BYTE_MIN <= value <= INT_BYTE_MAX:
