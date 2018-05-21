@@ -31,8 +31,8 @@ def scanning_invalid_connection():
         time.sleep(5)
 
 
-thread = threading.Thread(target=scanning_invalid_connection)
-thread.start()
+# thread = threading.Thread(target=scanning_invalid_connection)
+# thread.start()
 
 
 def get_provider_connection(host):

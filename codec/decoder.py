@@ -4,6 +4,37 @@ from datetime import datetime
 from common.constants import response_status_message
 from common.util import *
 
+functions = {}
+
+
+def ranges(*defined_ranges):
+    """
+    根据hessian协议，把处理方法交给其定义好的范围
+    :param defined_ranges:
+    :return:
+    """
+
+    def decorator(func):
+        # 遍历所有的范围
+        for defined_range in defined_ranges:
+            if isinstance(defined_range, (tuple, list)):
+                if not len(defined_range) == 2:
+                    raise ValueError('Invalid range {}'.format(defined_range))
+                nums = range(defined_range[0], defined_range[1] + 1)
+                for num in nums:
+                    functions[num] = func
+            elif isinstance(defined_range, int):
+                functions[defined_range] = func
+            else:
+                raise ValueError('Defined value {} illegal'.format(defined_ranges))
+
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)  # 原始方法正常执行
+
+        return wrapper
+
+    return decorator
+
 
 class Response(object):
     """
@@ -62,6 +93,7 @@ class Response(object):
         self.__index += num
         return value
 
+    @ranges(ord('T'), ord('F'))
     def read_boolean(self):
         """
         读取一个布尔类型
@@ -75,6 +107,7 @@ class Response(object):
         else:
             raise Exception('illegal boolean value: {0}'.format(value))
 
+    @ranges((0x80, 0xd7), ord('I'))
     def read_int(self):
         """
         读取一个整型数据
@@ -96,6 +129,7 @@ class Response(object):
             result = byte_list_2_num(self.read_bytes(4))
         return result
 
+    @ranges((0x5b, 0x5f), ord('D'))
     def read_double(self):
         """
         读取一个浮点类型
@@ -139,6 +173,7 @@ class Response(object):
             length -= 1
         return value
 
+    @ranges((0x00, 0x1f), (0x30, 0x33), 0x52, ord('S'))
     def read_string(self):
         """
         读取一个字符串
@@ -161,6 +196,7 @@ class Response(object):
         buf.extend(self._read_utf(length))
         return str(bytearray(buf))
 
+    @ranges((0x60, 0x6f), ord('O'), ord('C'))
     def read_object(self):
         """
         读取一个对象
@@ -213,6 +249,7 @@ class Response(object):
         else:
             raise Exception('Unknown _type type for value: {0}'.format(_type))
 
+    @ranges((0x70, 0x7f), (0x55, 0x58))
     def read_list(self):
         """
         读取一个列表
@@ -248,6 +285,7 @@ class Response(object):
 
         return result
 
+    @ranges((0xd8, 0xff), (0x38, 0x3f), 0x59, ord('L'))
     def read_long(self):
         """
         读取一个long类型的数字
@@ -271,6 +309,7 @@ class Response(object):
             raise ValueError('{0} is not long type'.format(value))
         return result
 
+    @ranges(ord('N'))
     def read_null(self):
         """
         读取一个None
@@ -282,6 +321,7 @@ class Response(object):
         else:
             raise Exception('{0} is not null'.format(value))
 
+    @ranges(ord('H'), ord('M'))
     def read_map(self):
         """
         读取一个dict
@@ -300,6 +340,7 @@ class Response(object):
         else:
             raise Exception('{0} is not a map.'.format(value))
 
+    @ranges(0x4a, 0x4b)
     def read_date(self):
         """
         读取一个date类型的值
@@ -321,29 +362,8 @@ class Response(object):
         :return:
         """
         data_type = self.get_byte()
-        if data_type == ord('T') or data_type == ord('F'):
-            return self.read_boolean()
-        elif 0x80 <= data_type <= 0xd7 or data_type == ord('I'):
-            return self.read_int()
-        elif 0x5b <= data_type <= 0x5f or data_type == ord('D'):
-            return self.read_double()
-        elif 0xd8 <= data_type <= 0xff or 0x38 <= data_type <= 0x3f \
-                or data_type == 0x59 or data_type == ord('L'):
-            return self.read_long()
-        elif 0x00 <= data_type <= 0x1f or 0x30 <= data_type <= 0x33 or data_type == 0x52 or data_type == ord('S'):
-            return self.read_string()
-        elif 0x60 <= data_type <= 0x6f or data_type == ord('O') or data_type == ord('C'):
-            return self.read_object()
-        elif 0x70 <= data_type <= 0x7f or 0x55 <= data_type <= 0x58:
-            return self.read_list()
-        elif data_type in (ord('H'), ord('M')):
-            return self.read_map()
-        elif data_type in (0x4a, 0x4b):
-            return self.read_date()
-        elif data_type == ord('N'):
-            return self.read_null()
-        else:
-            raise Exception('Unknown param type.')
+        func = functions[data_type]
+        return func(self)
 
     def __repr__(self):
         return str(self.__data)
