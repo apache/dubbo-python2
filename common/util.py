@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-
+import os
+import socket
 import struct
 
 
@@ -41,3 +42,21 @@ def double_to_long_bits(value):
         return 0x7ff8000000000000L
     else:
         return struct.unpack('Q', struct.pack('d', value))[0]
+
+
+def get_ip():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.connect(('8.8.8.8', 80))
+        ip = sock.getsockname()[0]
+    finally:
+        sock.close()
+    return ip
+
+
+def get_pid():
+    return os.getpid()
+
+
+if __name__ == '__main__':
+    print get_pid()

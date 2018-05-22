@@ -7,14 +7,19 @@ from connection.connections import ZkRegister, get_provider_connection
 
 
 class DubboClient(object):
-    def __init__(self, zk_register, interface, version='1.0.0', dubbo_version='2.4.10'):
-        self.zk_register = zk_register
+    def __init__(self, interface, version='1.0.0', dubbo_version='2.4.10', zk_register=None, host=None):
         self.interface = interface
         self.version = version
         self.dubbo_version = dubbo_version
 
+        self.zk_register = zk_register
+        self.host = host
+
     def call(self, method, args=()):
-        host = self.zk_register.get_provider_host(self.interface)
+        if self.zk_register:  # 优先从zk中获取provider的host
+            host = self.zk_register.get_provider_host(self.interface)
+        else:
+            host = self.host
         client = get_provider_connection(host)
 
         request_param = {
@@ -43,7 +48,8 @@ def pretty_print(value):
 
 if __name__ == '__main__':
     zk = ZkRegister('127.0.0.1:2181')
-    dubbo = DubboClient(zk, 'me.hourui.echo.provider.Echo')
+    dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
+    # dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
 
     pretty_print(dubbo.call('echo', ['张老师', '三', 19, 2000.0, True]))
     pretty_print(dubbo.call('echo1', '昊天金阙无上至尊自然妙有弥罗至真高天上圣大慈仁者玉皇赦罪锡福大天尊玄穹高上帝'))

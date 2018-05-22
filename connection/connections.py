@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
-import re
 import socket
 import threading
 from random import randint
-from urllib import unquote
+from urllib import unquote, quote
 
 import time
+from urlparse import urlparse, parse_qsl
+
 from kazoo.client import KazooClient
 
-DUBBO_ZK_PROVIDERS = '/dubbo/{0}/providers'
-PROVIDER_HOST_PATTERN = re.compile(r'dubbo://(?P<host>[\d\D]+?)/')
+from common.util import get_ip, get_pid
+
+DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
+DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
 
 # 根据远程host保存与此host相关的连接
 connection_pool = {}
@@ -41,6 +44,8 @@ def get_provider_connection(host):
     :param host:
     :return:
     """
+    if not host or ':' not in host:
+        raise ValueError('invalid host {}'.format(host))
     if not connection_pool.get(host):
         ip, port = host.split(':')
         connection_pool[host] = Connection(ip, int(port))
@@ -48,12 +53,13 @@ def get_provider_connection(host):
 
 
 class ZkRegister(object):
-    def __init__(self, hosts):
+    def __init__(self, hosts, application_name='search_platform'):
         zk = KazooClient(hosts=hosts)
         zk.start()
 
         self.zk = zk
         self.hosts = {}
+        self.application_name = application_name
 
     def get_provider_host(self, interface):
         """
@@ -65,15 +71,52 @@ class ZkRegister(object):
             path = DUBBO_ZK_PROVIDERS.format(interface)
             if self.zk.exists(path):
                 providers = self.zk.get_children(path)
+                if len(providers) == 0:
+                    raise Exception('no providers for interface {}'.format(interface))
+                providers = map(parse_url, providers)
+
                 self._register_consumer(providers)
-                self.hosts[interface] = map(parse_provider_host, providers)
+                self.hosts[interface] = map(lambda provider: provider['host'], providers)
             else:
                 raise Exception('can\'t providers for interface {0}'.format(interface))
         hosts = self.hosts[interface]
         return hosts[randint(0, len(hosts) - 1)]
 
     def _register_consumer(self, providers):
-        pass
+        """
+        把本机注册到对应的interface的consumer上去
+        :param providers:
+        :return:
+        """
+        provider = providers[0]
+        provider_fields = provider['fields']
+
+        consumer = 'consumer://' + get_ip() + provider['path'] + '?'
+        fields = {
+            'application': self.application_name,
+            'category': 'consumers',
+            'check': 'false',
+            'connected': 'true',
+            'dubbo': provider_fields['dubbo'],
+            'interface': provider_fields['interface'],
+            'methods': provider_fields['methods'],
+            'pid': get_pid(),
+            'revision': provider_fields['revision'],
+            'side': 'consumer',
+            'timestamp': int(time.time() * 1000),
+            'version': provider_fields['version'],
+        }
+
+        keys = fields.keys()
+        keys.sort()
+        for key in keys:
+            value = fields[key]
+            consumer += '{0}={1}&'.format(key, value)
+        consumer = consumer[:-1]  # 干掉最后一个&
+
+        consumer_path = DUBBO_ZK_CONSUMERS.format(fields['interface'])
+        self.zk.ensure_path(consumer_path)
+        self.zk.create(consumer_path + '/' + quote(consumer, safe=''), ephemeral=True)
 
     def close(self):
         self.zk.stop()
@@ -105,14 +148,19 @@ class Connection(object):
         self.__sock.close()
 
 
-def parse_provider_host(provider):
-    """
-    从dubbo在zk中provider的信息中解析出此provider的host
-    :param provider:
-    :return:
-    """
-    provider = unquote(provider)
-    m = PROVIDER_HOST_PATTERN.match(provider)
-    if m:
-        return m.group('host')
-    raise ValueError('can\'t find provider host in [{0}]'.format(provider))
+def parse_url(url_str):
+    url = urlparse(unquote(url_str))
+    fields = dict(parse_qsl(url.query))
+    result = {
+        'scheme': url.scheme,
+        'host': url.netloc,
+        'hostname': url.hostname,
+        'port': url.port,
+        'path': url.path,
+        'fields': fields
+    }
+    return result
+
+
+if __name__ == '__main__':
+    pass
