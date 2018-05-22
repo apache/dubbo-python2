@@ -53,6 +53,14 @@ def get_provider_connection(host):
 
 
 class ZkRegister(object):
+    """
+    ZkRegister的主要作用：
+    1. 根据特定的interface从zk中取出与之相关的所有provider的host并且监听
+       provider的变化，当发生变化时更新最新的hosts到本地缓存；
+    2. 当从zk中获取指定的interface的provider的时候，把当前进程作为此interface
+       的一个consumer注册到zk中，并设置此节点的状态为ephemeral；
+    """
+
     def __init__(self, hosts, application_name='search_platform'):
         zk = KazooClient(hosts=hosts)
         zk.start()

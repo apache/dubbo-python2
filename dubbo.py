@@ -3,8 +3,11 @@ import json
 
 import time
 
+import logging
+
 from codec.decoder import get_response_body_length, Response
 from codec.encoder import encode
+from common.loggers import init_log
 from connection.connections import ZkRegister, get_provider_connection
 
 
@@ -49,6 +52,7 @@ def pretty_print(value):
 
 
 if __name__ == '__main__':
+    init_log()  # 初始化日志配置，调用端需要自己配置日志属性
     zk = ZkRegister('127.0.0.1:2181')
     dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
     # dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
@@ -82,4 +86,6 @@ if __name__ == '__main__':
     pretty_print(dubbo.call('echo15'))
     pretty_print(dubbo.call('echo16'))
 
-    time.sleep(10000)
+    log = logging.getLogger('dubbo.py')
+    log.debug('1111')
+    log.info('22222')
