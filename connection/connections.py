@@ -70,7 +70,7 @@ class ZkRegister(object):
         if not self.hosts.get(interface):
             path = DUBBO_ZK_PROVIDERS.format(interface)
             if self.zk.exists(path):
-                providers = self.zk.get_children(path)
+                providers = self.zk.get_children(path, watch=self._watch_children)
                 if len(providers) == 0:
                     raise Exception('no providers for interface {}'.format(interface))
                 providers = map(parse_url, providers)
@@ -81,6 +81,22 @@ class ZkRegister(object):
                 raise Exception('can\'t providers for interface {0}'.format(interface))
         hosts = self.hosts[interface]
         return hosts[randint(0, len(hosts) - 1)]
+
+    def _watch_children(self, event):
+        """
+        对某个provider下的子节点进行监听，一旦provider发生了变化则对本地缓存进行更新
+        :param event:
+        :return:
+        """
+        path = event.path
+        interface = path.split('/')[2]
+
+        # 非常的古怪因为children的watch好像只会生效一次所以需要反复的重新设置watch
+        providers = self.zk.get_children(path, watch=self._watch_children)
+        if len(providers) == 0:
+            raise Exception('no providers for interface {}'.format(interface))
+        providers = map(parse_url, providers)
+        self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
     def _register_consumer(self, providers):
         """
@@ -149,6 +165,11 @@ class Connection(object):
 
 
 def parse_url(url_str):
+    """
+    把url字符串解析为适合于操作的对象
+    :param url_str:
+    :return:
+    """
     url = urlparse(unquote(url_str))
     fields = dict(parse_qsl(url.query))
     result = {

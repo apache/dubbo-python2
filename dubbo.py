@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import json
 
+import time
+
 from codec.decoder import get_response_body_length, Response
 from codec.encoder import encode
 from connection.connections import ZkRegister, get_provider_connection
@@ -79,3 +81,5 @@ if __name__ == '__main__':
     pretty_print(dubbo.call('echo14'))
     pretty_print(dubbo.call('echo15'))
     pretty_print(dubbo.call('echo16'))
+
+    time.sleep(10000)
