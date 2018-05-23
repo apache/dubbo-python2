@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from common.util import *
+from common.util import num_2_byte_list
 
 # 服务端的响应码
 response_status_message = {
@@ -45,3 +45,10 @@ STRING_SHORT_MAX = 0x3ff
 
 # MAGIC_NUM(2) + FLAG(1) + STATUS(1) + INVOKE_ID(8)
 DEFAULT_REQUEST_META = num_2_byte_list(0xdabbc2000000000000000000)
+
+# 客户端对服务端发送的心跳的请求的头部
+CLI_HEARTBEAT_REQ_HEAD = num_2_byte_list(0xdabbe2) + [0]
+# 客户端对服务端发送的心跳的响应的头部
+CLI_HEARTBEAT_RES_HEAD = num_2_byte_list(0xdabb2214)
+# 心跳尾部
+CLI_HEARTBEAT_TAIL = [0, 0, 0, 1] + num_2_byte_list(0x4e)

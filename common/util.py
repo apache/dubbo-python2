@@ -3,6 +3,9 @@ import os
 import socket
 import struct
 
+ip = None
+heartbeat_id = 0
+
 
 def num_2_byte_list(num):
     """
@@ -45,6 +48,9 @@ def double_to_long_bits(value):
 
 
 def get_ip():
+    global ip
+    if ip:
+        return ip
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         sock.connect(('8.8.8.8', 80))
@@ -58,5 +64,15 @@ def get_pid():
     return os.getpid()
 
 
+def get_heartbeat_id():
+    global heartbeat_id
+    heartbeat_id += 1
+    heartbeat_id_byte = num_2_byte_list(heartbeat_id)
+    while len(heartbeat_id_byte) < 8:
+        heartbeat_id_byte = [0] + heartbeat_id_byte
+    return heartbeat_id_byte
+
+
 if __name__ == '__main__':
-    print get_pid()
+    for i in range(10):
+        print get_ip()

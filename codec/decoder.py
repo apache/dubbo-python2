@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
+import struct
+
 from common.constants import response_status_message
-from common.util import *
+from common.util import byte_list_2_num
 
 functions = {}
 
@@ -369,7 +371,7 @@ class Response(object):
         return str(self.__data)
 
 
-def get_response_body_length(response_head):
+def get_body_length(response_head):
     """
     计算出响应体的长度
     :param response_head:
@@ -378,10 +380,24 @@ def get_response_body_length(response_head):
     # Magic number
     if not (response_head[0] == 0xda and response_head[1] == 0xbb):
         raise Exception('illegal response')
-    response_status = response_head[3]
-    if response_status != 20:
-        raise Exception(response_status_message[response_status])
-    return byte_list_2_num(response_head[12:])
+
+    # 第三位为1表示这是一个心跳包
+    if response_head[2] & 0x20 == 0x20:
+        if response_head[2] & 0x80 == 0x80:
+            # 第一位为1，一个心跳请求的包
+            heartbeat = 2
+        else:
+            # 第一位为0，一个心跳响应的包
+            heartbeat = 1
+            response_status = response_head[3]
+            if response_status != 20:
+                raise Exception(response_status_message[response_status])
+    else:
+        heartbeat = 0
+        response_status = response_head[3]
+        if response_status != 20:
+            raise Exception(response_status_message[response_status])
+    return heartbeat, byte_list_2_num(response_head[12:])
 
 
 if __name__ == '__main__':

@@ -7,49 +7,117 @@ from urllib import unquote, quote
 import time
 from urlparse import urlparse, parse_qsl
 
+import logging
 from kazoo.client import KazooClient
 
-from common.util import get_ip, get_pid
+from codec.decoder import Response, get_body_length
+from codec.encoder import encode
+from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
+from common.util import get_ip, get_pid, get_heartbeat_id
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
 DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
 
-# 根据远程host保存与此host相关的连接
-connection_pool = {}
+logger = logging.getLogger('dubbo.py')
 
 
-def scanning_invalid_connection():
-    """
-    清理已关闭的链接或超时的链接
-    :return:
-    """
-    while 1:
-        for key in connection_pool.keys():
-            conn = connection_pool[key]
-            if time.time() - conn.last_active > 10:
-                conn.close()
-            if conn.closed:
-                print 'close connection to remote host {}'.format(key)
-                del connection_pool[key]
-        time.sleep(5)
+class ConnectionPool(object):
+    def __init__(self):
+        # 根据远程host保存与此host相关的连接
+        self._connection_pool = {}
+        # 用于在多个线程之间保存结果
+        self.results = {}
+        self.client_heartbeats = {}
+        self.evt = threading.Event()
+
+        threading.Timer(10, self._send_heartbeat).start()
+
+    def get(self, host, request_param):
+        conn = self._get_connection(host)
+
+        request = encode(request_param)
+        conn.write(request)
+        while 1:
+            self.evt.wait(10)
+            self.evt.clear()
+            if host in self.results:
+                break
+
+        result = self.results[host]
+        del self.results[host]
+        return result
+
+    def _get_connection(self, host):
+        """
+        通过host获取到与此host相关的socket，本地会对socket进行缓存
+        :param host:
+        :return:
+        """
+        if not host or ':' not in host:
+            raise ValueError('invalid host {}'.format(host))
+        if host not in self._connection_pool:
+            ip, port = host.split(':')
+            self._connection_pool[host] = Connection(ip, int(port))
+            self.client_heartbeats[host] = 0
+
+            # 创建连接后开始异步的读取此连接的数据
+            thread = threading.Thread(target=self._read, args=(host,))
+            thread.start()
+        return self._connection_pool[host]
+
+    def _read(self, host):
+        conn = self._get_connection(host)
+
+        while 1:
+            # 数据的头部大小为16个字节
+            head = conn.read(16)
+            if len(head) == 0:  # 连接已关闭
+                logger.warn('{} closed'.format(host))
+                break
+
+            heartbeat, body_length = get_body_length(head)
+            body = conn.read(body_length)
+
+            # 心跳请求数据包
+            if heartbeat == 2:
+                logger.debug('❤️')
+                msg_id = head[4:12]
+                heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
+                conn.write(bytearray(heartbeat_response))
+            # 心跳响应数据包
+            elif heartbeat == 1:
+                logger.debug('❤️')
+                self.client_heartbeats[host] -= 1
+            else:
+                res = Response(body)
+                res.read_int()  # 响应的状态
+                result = res.read_next()
+
+                self.results[host] = result
+                self.evt.set()
+
+    def _send_heartbeat(self):
+        """
+        客户端发送心跳消息
+        :return:
+        """
+        # 这玩意每次只能执行一次，所以需要反复的重新设定任务
+        threading.Timer(10, self._send_heartbeat).start()
+
+        for host in self._connection_pool.keys():
+            conn = self._connection_pool[host]
+            if time.time() - conn.last_active > 60:
+                if self.client_heartbeats[host] >= 3:
+                    # 先关闭连接，等待下次请求使用连接时再次创建连接
+                    conn.close()
+                    del self._connection_pool[host]
+                    continue
+                self.client_heartbeats[host] += 1
+                req = CLI_HEARTBEAT_REQ_HEAD + get_heartbeat_id() + CLI_HEARTBEAT_TAIL
+                conn.write(bytearray(req))
 
 
-# thread = threading.Thread(target=scanning_invalid_connection)
-# thread.start()
-
-
-def get_provider_connection(host):
-    """
-    通过host获取到与此host相关的socket，本地会对socket进行缓存
-    :param host:
-    :return:
-    """
-    if not host or ':' not in host:
-        raise ValueError('invalid host {}'.format(host))
-    if not connection_pool.get(host):
-        ip, port = host.split(':')
-        connection_pool[host] = Connection(ip, int(port))
-    return connection_pool[host]
+connection_pool = ConnectionPool()
 
 
 class ZkRegister(object):
@@ -157,7 +225,6 @@ class Connection(object):
         self.__sock = sock
 
         self.last_active = time.time()
-        self.closed = False
 
     def write(self, data):
         self.last_active = time.time()
@@ -168,7 +235,7 @@ class Connection(object):
         return bytearray(self.__sock.recv(length))
 
     def close(self):
-        self.closed = True
+        self.__sock.shutdown(socket.SHUT_RDWR)
         self.__sock.close()
 
 

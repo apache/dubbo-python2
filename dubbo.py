@@ -5,10 +5,10 @@ import time
 
 import logging
 
-from codec.decoder import get_response_body_length, Response
-from codec.encoder import encode
 from common.loggers import init_log
-from connection.connections import ZkRegister, get_provider_connection
+from connection.connections import ZkRegister, connection_pool
+
+logger = logging.getLogger('dubbo.py')
 
 
 class DubboClient(object):
@@ -25,7 +25,7 @@ class DubboClient(object):
             host = self.zk_register.get_provider_host(self.interface)
         else:
             host = self.host
-        client = get_provider_connection(host)
+        logger.debug('get host {}'.format(host))
 
         request_param = {
             'dubbo_version': self.dubbo_version,
@@ -34,25 +34,18 @@ class DubboClient(object):
             'method': method,
             'arguments': args
         }
-        request = encode(request_param)
-        client.write(request)
-
-        # 响应数据的头部大小为16个字节
-        response_head = client.read(16)
-        response_body_length = get_response_body_length(response_head)
-
-        response_body = client.read(response_body_length)
-        res = Response(response_body)
-        res.read_int()  # 响应的状态
-        return res.read_next()
+        # logger.debug(request_param)
+        result = connection_pool.get(host, request_param)
+        return result
 
 
 def pretty_print(value):
-    print json.dumps(value, ensure_ascii=False, indent=4, sort_keys=True)
+    logger.debug(json.dumps(value, ensure_ascii=False, indent=4, sort_keys=True))
 
 
 if __name__ == '__main__':
     init_log()  # 初始化日志配置，调用端需要自己配置日志属性
+
     zk = ZkRegister('127.0.0.1:2181')
     dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
     # dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
@@ -89,3 +82,4 @@ if __name__ == '__main__':
     log = logging.getLogger('dubbo.py')
     log.debug('1111')
     log.info('22222')
+    time.sleep(1000)

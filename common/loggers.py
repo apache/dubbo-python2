@@ -23,13 +23,13 @@ class MyFormatter(logging.Formatter):
         level_name = record.levelname
         if level_name == 'ERROR':
             color = 31
-        elif level_name == 'WARN':
+        elif level_name == 'WARNING':
             color = 33
         elif level_name == 'INFO':
             color = 32
         else:
             color = 34
-        while len(level_name) < 5:
+        while len(level_name) < 7:
             level_name += ' '
         record.levelname = '\033[{0}m{1}\033[0m'.format(color, level_name)
         return logging.Formatter.format(self, record)
