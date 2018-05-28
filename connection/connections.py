@@ -17,6 +17,7 @@ from common.util import get_ip, get_pid, get_heartbeat_id
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
 DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
+DUBBO_ZK_CONFIGURATORS = '/dubbo/{}/configurators'
 
 logger = logging.getLogger('dubbo.py')
 
@@ -135,6 +136,7 @@ class ZkRegister(object):
 
         self.zk = zk
         self.hosts = {}
+        self.weights = {}
         self.application_name = application_name
 
     def get_provider_host(self, interface):
@@ -150,13 +152,45 @@ class ZkRegister(object):
                 if len(providers) == 0:
                     raise Exception('no providers for interface {}'.format(interface))
                 providers = map(parse_url, providers)
-
                 self._register_consumer(providers)
                 self.hosts[interface] = map(lambda provider: provider['host'], providers)
+
+                # 试图从配置中取出权重相关的信息
+                configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
+                                                     watch=self._watch_configurators)
+                if configurators:
+                    configurators = map(parse_url, configurators)
+                    conf = {}
+                    for configurator in configurators:
+                        conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
+                    self.weights[interface] = conf
             else:
                 raise Exception('can\'t providers for interface {0}'.format(interface))
+        return self._routing_with_wight(interface)
+
+    def _routing_with_wight(self, interface):
+        """
+        根据接口名称以及配置好的权重信息获取一个host
+        :param interface:
+        :return:
+        """
         hosts = self.hosts[interface]
-        return hosts[randint(0, len(hosts) - 1)]
+        # 此接口没有权重设置，使用朴素的路由算法
+        if not self.weights.get(interface):
+            return hosts[randint(0, len(hosts) - 1)]
+
+        weights = self.weights[interface]
+        hosts_weight = []
+        for host in hosts:
+            hosts_weight.append(weights.get(host, 100))
+
+        hit = randint(0, sum(hosts_weight) - 1)
+        print hit
+        for i in range(len(hosts)):
+            if hit <= sum(hosts_weight[:i + 1]):
+                return hosts[i]
+
+        raise Exception('error for finding host with weight.')
 
     def _watch_children(self, event):
         """
@@ -173,6 +207,28 @@ class ZkRegister(object):
             raise Exception('no providers for interface {}'.format(interface))
         providers = map(parse_url, providers)
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
+
+    def _watch_configurators(self, event):
+        """
+        监测某个interface中provider的权重的变化信息
+        :param event:
+        :return:
+        """
+        path = event.path
+        interface = path.split('/')[2]
+
+        # 试图从配置中取出权重相关的信息
+        configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
+                                             watch=self._watch_configurators)
+        if configurators:
+            configurators = map(parse_url, configurators)
+            conf = {}
+            for configurator in configurators:
+                conf[configurator['host']] = configurator['fields'].get('weight', 100)
+            self.weights[interface] = conf
+        else:
+            # 没有权重配置则意味着此配置可以被删除
+            del self.weights[interface]
 
     def _register_consumer(self, providers):
         """
