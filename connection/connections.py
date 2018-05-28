@@ -79,15 +79,15 @@ class ConnectionPool(object):
             heartbeat, body_length = get_body_length(head)
             body = conn.read(body_length)
 
-            # 心跳请求数据包
+            # 远程主机发送的心跳请求数据包
             if heartbeat == 2:
-                logger.debug('❤️')
+                logger.debug('❤️ -> {}'.format(conn.remote_host()))
                 msg_id = head[4:12]
                 heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
                 conn.write(bytearray(heartbeat_response))
-            # 心跳响应数据包
+            # 远程主机发送的心跳响应数据包
             elif heartbeat == 1:
-                logger.debug('❤️')
+                logger.debug('❤️ -> {}'.format(conn.remote_host()))
                 self.client_heartbeats[host] -= 1
             else:
                 res = Response(body)
@@ -279,6 +279,7 @@ class Connection(object):
         sock.connect((host, port))
         self.__sock = sock
 
+        self.__host = '{0}:{1}'.format(host, port)
         self.last_active = time.time()
 
     def write(self, data):
@@ -292,6 +293,9 @@ class Connection(object):
     def close(self):
         self.__sock.shutdown(socket.SHUT_RDWR)
         self.__sock.close()
+
+    def remote_host(self):
+        return self.__host
 
 
 def parse_url(url_str):
