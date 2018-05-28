@@ -182,15 +182,14 @@ class ZkRegister(object):
         weights = self.weights[interface]
         hosts_weight = []
         for host in hosts:
-            hosts_weight.append(weights.get(host, 100))
+            hosts_weight.append(int(weights.get(host, '100')))
 
         hit = randint(0, sum(hosts_weight) - 1)
-        print hit
         for i in range(len(hosts)):
             if hit <= sum(hosts_weight[:i + 1]):
                 return hosts[i]
 
-        raise Exception('error for finding host with weight.')
+        raise Exception('error for finding [{}] host with weight.'.format(interface))
 
     def _watch_children(self, event):
         """
