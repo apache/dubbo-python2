@@ -60,7 +60,8 @@ class Response(object):
         self.__index = 0  # 当前索引的位置
 
         self.types = []  # 保存所有通过read_type解析出来的type
-        self.ref = []  # 保存所有引用类型的所有字段名称
+        self.ref = []  # 保存所有的引用类型的类名
+        self.classes = {}  # 保存类名和类里面的变量之间的关系
 
     def get_byte(self):
         """
@@ -209,15 +210,15 @@ class Response(object):
         value = self.read_byte()
         if 0x60 <= value <= 0x6f:
             ref = value - 0x60
-            field_names = self.ref[ref]
+            field_names = self.classes[self.ref[ref]]
             for field_name in field_names:
-                field_value = self.read_string()
+                field_value = self.read_next()
                 result[field_name] = field_value
         elif value == ord('O'):
             ref = self.read_int()
-            field_names = self.ref[ref]
+            field_names = self.classes[self.ref[ref]]
             for field_name in field_names:
-                field_value = self.read_string()
+                field_value = self.read_next()
                 result[field_name] = field_value
         elif value == ord('C'):
             path = self.read_string()
@@ -227,8 +228,8 @@ class Response(object):
             for i in range(field_length):
                 field_names.append(self.read_string())
 
-            # 由于Java中的类型名称在Python中不再有意义，所以此处我们只需要引用类型的字段名称
-            self.ref.append(field_names)
+            self.ref.append(path)
+            self.classes[path] = field_names
 
             what_the_fuck = self.read_byte()
 
@@ -357,6 +358,16 @@ class Response(object):
         else:
             raise ValueError('{0} is not date type'.format(value))
         return datetime.fromtimestamp(timestamp / 1e3).strftime("%Y-%m-%dT%H:%M:%S+0800")
+
+    @ranges(0x51)
+    def read_ref(self):
+        """
+        读取一个引用类型
+        :return:
+        """
+        self.read_byte()  # 干掉0x51
+        ref_id = self.read_int()
+        return self.ref[ref_id]
 
     def read_next(self):
         """

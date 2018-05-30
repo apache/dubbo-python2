@@ -78,6 +78,7 @@ if __name__ == '__main__':
     pretty_print(dubbo.call('echo14'))
     pretty_print(dubbo.call('echo15'))
     pretty_print(dubbo.call('echo16'))
+    pretty_print(dubbo.call('echo17'))
 
     log = logging.getLogger('dubbo.py')
     log.debug('1111')

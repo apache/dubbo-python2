@@ -89,13 +89,22 @@ class ConnectionPool(object):
             elif heartbeat == 1:
                 logger.debug('❤️ -> {}'.format(conn.remote_host()))
                 self.client_heartbeats[host] -= 1
+            # 普通的数据包
             else:
                 res = Response(body)
-                res.read_int()  # 响应的状态
-                result = res.read_next()
-
-                self.results[host] = result
-                self.evt.set()
+                flag = res.read_int()
+                if flag == 2:  # 响应的值为NULL
+                    self.results[host] = None
+                    self.evt.set()
+                elif flag == 1:  # 正常的响应值
+                    result = res.read_next()
+                    self.results[host] = result
+                    self.evt.set()
+                elif flag == 0:  # 异常的响应值
+                    error = res.read_next()
+                    print error
+                else:
+                    raise Exception("Unknown result flag, expect '0' '1' '2', get " + flag)
 
     def _send_heartbeat(self):
         """
