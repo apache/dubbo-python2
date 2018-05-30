@@ -13,6 +13,7 @@ from kazoo.client import KazooClient
 from codec.decoder import Response, get_body_length
 from codec.encoder import encode
 from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
+from common.exceptions import DubboException
 from common.util import get_ip, get_pid, get_heartbeat_id
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
@@ -46,6 +47,10 @@ class ConnectionPool(object):
 
         result = self.results[host]
         del self.results[host]
+
+        if isinstance(result, DubboException):
+            raise result
+
         return result
 
     def _get_connection(self, host):
@@ -95,16 +100,19 @@ class ConnectionPool(object):
                 flag = res.read_int()
                 if flag == 2:  # 响应的值为NULL
                     self.results[host] = None
-                    self.evt.set()
                 elif flag == 1:  # 正常的响应值
                     result = res.read_next()
                     self.results[host] = result
-                    self.evt.set()
                 elif flag == 0:  # 异常的响应值
-                    error = res.read_next()
-                    print error
+                    err = res.read_next()
+                    error = '\n{cause}: {detailMessage}\n'.format(**err)
+                    stack_trace = err['stackTrace']
+                    for trace in stack_trace:
+                        error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
+                    self.results[host] = DubboException(error)
                 else:
                     raise Exception("Unknown result flag, expect '0' '1' '2', get " + flag)
+                self.evt.set()  # 唤醒请求线程
 
     def _send_heartbeat(self):
         """
