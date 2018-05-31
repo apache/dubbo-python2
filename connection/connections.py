@@ -40,7 +40,7 @@ class ConnectionPool(object):
         request = encode(request_param)
         conn.write(request)
         while 1:
-            self.evt.wait(10)
+            self.evt.wait()
             self.evt.clear()
             if host in self.results:
                 break
@@ -79,6 +79,7 @@ class ConnectionPool(object):
             head = conn.read(16)
             if len(head) == 0:  # 连接已关闭
                 logger.warn('{} closed'.format(host))
+                del self._connection_pool[host]
                 break
 
             heartbeat, body_length = get_body_length(head)
