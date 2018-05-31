@@ -219,7 +219,9 @@ class ZkRegister(object):
 
         # 非常的古怪因为children的watch好像只会生效一次所以需要反复的重新设置watch
         providers = self.zk.get_children(path, watch=self._watch_children)
+        logger.debug('{} providers: {}'.format(interface, providers))
         if len(providers) == 0:
+            logger.warn('no providers for interface {}'.format(interface))
             raise RegisterException('no providers for interface {}'.format(interface))
         providers = map(parse_url, providers)
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
