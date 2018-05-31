@@ -5,6 +5,7 @@ from common.constants import DEFAULT_REQUEST_META, INT_DIRECT_MAX, INT_DIRECT_MI
     INT_BYTE_MIN, BC_INT_BYTE_ZERO, INT_SHORT_MIN, INT_SHORT_MAX, BC_INT_SHORT_ZERO, BC_DOUBLE_ZERO, BC_DOUBLE_ONE, \
     BC_DOUBLE_BYTE, BC_DOUBLE_MILL, STRING_DIRECT_MAX, BC_STRING_DIRECT, STRING_SHORT_MAX, BC_STRING_SHORT, \
     BC_DOUBLE_SHORT
+from common.exceptions import HessianTypeError
 from common.util import double_to_long_bits, num_2_byte_list
 
 
@@ -48,7 +49,7 @@ def _encode_request_body(body):
         elif isinstance(argument, str):
             parameter_types += 'Ljava/lang/String;'
         else:
-            raise Exception('Unknown argument type: {0}'.format(argument))
+            raise HessianTypeError('Unknown argument type: {0}'.format(argument))
 
     body = []
     body.extend(_encode_single_value(dubbo_version))
@@ -167,7 +168,7 @@ def _encode_single_value(value):
         result.extend(list(bytearray(value)))  # 加上变量数组
         return result
     else:
-        raise Exception('Unknown argument type: {0}'.format(value))
+        raise HessianTypeError('Unknown argument type: {0}'.format(value))
 
 
 def _get_request_body_length(body):

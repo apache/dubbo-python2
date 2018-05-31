@@ -13,7 +13,7 @@ from kazoo.client import KazooClient
 from codec.decoder import Response, get_body_length
 from codec.encoder import encode
 from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
-from common.exceptions import DubboException
+from common.exceptions import DubboException, RegisterException
 from common.util import get_ip, get_pid, get_heartbeat_id
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
@@ -111,7 +111,7 @@ class ConnectionPool(object):
                         error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
                     self.results[host] = DubboException(error)
                 else:
-                    raise Exception("Unknown result flag, expect '0' '1' '2', get " + flag)
+                    raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
                 self.evt.set()  # 唤醒请求线程
 
     def _send_heartbeat(self):
@@ -167,7 +167,7 @@ class ZkRegister(object):
             if self.zk.exists(path):
                 providers = self.zk.get_children(path, watch=self._watch_children)
                 if len(providers) == 0:
-                    raise Exception('no providers for interface {}'.format(interface))
+                    raise RegisterException('no providers for interface {}'.format(interface))
                 providers = map(parse_url, providers)
                 self._register_consumer(providers)
                 self.hosts[interface] = map(lambda provider: provider['host'], providers)
@@ -182,7 +182,7 @@ class ZkRegister(object):
                         conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
                     self.weights[interface] = conf
             else:
-                raise Exception('can\'t providers for interface {0}'.format(interface))
+                raise RegisterException('can\'t providers for interface {0}'.format(interface))
         return self._routing_with_wight(interface)
 
     def _routing_with_wight(self, interface):
@@ -206,7 +206,7 @@ class ZkRegister(object):
             if hit <= sum(hosts_weight[:i + 1]):
                 return hosts[i]
 
-        raise Exception('error for finding [{}] host with weight.'.format(interface))
+        raise RegisterException('error for finding [{}] host with weight.'.format(interface))
 
     def _watch_children(self, event):
         """
@@ -220,7 +220,7 @@ class ZkRegister(object):
         # 非常的古怪因为children的watch好像只会生效一次所以需要反复的重新设置watch
         providers = self.zk.get_children(path, watch=self._watch_children)
         if len(providers) == 0:
-            raise Exception('no providers for interface {}'.format(interface))
+            raise RegisterException('no providers for interface {}'.format(interface))
         providers = map(parse_url, providers)
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
 

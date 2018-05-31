@@ -4,6 +4,7 @@ from datetime import datetime
 import struct
 
 from common.constants import response_status_message
+from common.exceptions import HessianTypeError, DubboException
 from common.util import byte_list_2_num
 
 functions = {}
@@ -108,7 +109,7 @@ class Response(object):
         elif value == ord('F'):
             return False
         else:
-            raise Exception('illegal boolean value: {0}'.format(value))
+            raise HessianTypeError('illegal boolean value: {0}'.format(value))
 
     @ranges((0x80, 0xd7), ord('I'))
     def read_int(self):
@@ -152,7 +153,7 @@ class Response(object):
         elif value == ord('D'):
             result = struct.unpack('>d', self.read_bytes(8))[0]
         else:
-            raise ValueError('{0} is not a float'.format(value))
+            raise HessianTypeError('{0} is not a float'.format(value))
         return result
 
     def _read_utf(self, length):
@@ -250,7 +251,7 @@ class Response(object):
             self.types.append(_type)
             return _type
         else:
-            raise Exception('Unknown _type type for value: {0}'.format(_type))
+            raise HessianTypeError('Unknown _type type for value: {0}'.format(_type))
 
     @ranges((0x70, 0x7f), (0x55, 0x58))
     def read_list(self):
@@ -309,7 +310,7 @@ class Response(object):
         elif value == ord('L'):
             result = struct.unpack('>q', self.read_bytes(8))[0]
         else:
-            raise ValueError('{0} is not long type'.format(value))
+            raise HessianTypeError('{0} is not long type'.format(value))
         return result
 
     @ranges(ord('N'))
@@ -322,7 +323,7 @@ class Response(object):
         if value == ord('N'):
             return None
         else:
-            raise Exception('{0} is not null'.format(value))
+            raise HessianTypeError('{0} is not null'.format(value))
 
     @ranges(ord('H'), ord('M'))
     def read_map(self):
@@ -341,7 +342,7 @@ class Response(object):
             self.read_byte()  # 干掉最后一个'Z'字符
             return result
         else:
-            raise Exception('{0} is not a map.'.format(value))
+            raise HessianTypeError('{0} is not a map.'.format(value))
 
     @ranges(0x4a, 0x4b)
     def read_date(self):
@@ -356,7 +357,7 @@ class Response(object):
             timestamp = byte_list_2_num(self.read_bytes(4))
             timestamp *= 60000
         else:
-            raise ValueError('{0} is not date type'.format(value))
+            raise HessianTypeError('{0} is not date type'.format(value))
         return datetime.fromtimestamp(timestamp / 1e3).strftime("%Y-%m-%dT%H:%M:%S+0800")
 
     @ranges(0x51)
@@ -390,7 +391,7 @@ def get_body_length(response_head):
     """
     # Magic number
     if not (response_head[0] == 0xda and response_head[1] == 0xbb):
-        raise Exception('illegal response')
+        raise DubboException('illegal response')
 
     # 第三位为1表示这是一个心跳包
     if response_head[2] & 0x20 == 0x20:
@@ -402,12 +403,12 @@ def get_body_length(response_head):
             heartbeat = 1
             response_status = response_head[3]
             if response_status != 20:
-                raise Exception(response_status_message[response_status])
+                raise DubboException(response_status_message[response_status])
     else:
         heartbeat = 0
         response_status = response_head[3]
         if response_status != 20:
-            raise Exception(response_status_message[response_status])
+            raise DubboException(response_status_message[response_status])
     return heartbeat, byte_list_2_num(response_head[12:])
 
 
