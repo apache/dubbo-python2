@@ -282,7 +282,7 @@ class ZkRegister(object):
 
         consumer_path = DUBBO_ZK_CONSUMERS.format(fields['interface'])
         self.zk.ensure_path(consumer_path)
-        self.zk.create(consumer_path + '/' + quote(consumer, safe=''), ephemeral=True)
+        self.zk.create_async(consumer_path + '/' + quote(consumer, safe=''), ephemeral=True)
 
     def close(self):
         self.zk.stop()
