@@ -13,24 +13,24 @@ logger = logging.getLogger('dubbo.py')
 
 class DubboClient(object):
     def __init__(self, interface, version='1.0.0', dubbo_version='2.4.10', zk_register=None, host=None):
-        self.interface = interface
-        self.version = version
-        self.dubbo_version = dubbo_version
+        self.__interface = interface
+        self.__version = version
+        self.__dubbo_version = dubbo_version
 
-        self.zk_register = zk_register
-        self.host = host
+        self.__zk_register = zk_register
+        self.__host = host
 
     def call(self, method, args=()):
-        if self.zk_register:  # 优先从zk中获取provider的host
-            host = self.zk_register.get_provider_host(self.interface)
+        if self.__zk_register:  # 优先从zk中获取provider的host
+            host = self.__zk_register.get_provider_host(self.__interface)
         else:
-            host = self.host
+            host = self.__host
         logger.debug('get host {}'.format(host))
 
         request_param = {
-            'dubbo_version': self.dubbo_version,
-            'version': self.version,
-            'path': self.interface,
+            'dubbo_version': self.__dubbo_version,
+            'version': self.__version,
+            'path': self.__interface,
             'method': method,
             'arguments': args
         }
