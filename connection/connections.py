@@ -38,7 +38,7 @@ class ConnectionPool(object):
         # 读写同步的锁
         self.__lock = threading.Lock()
 
-        reading_thread = threading.Thread(target=self._read)
+        reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
         reading_thread.start()
 
@@ -81,7 +81,7 @@ class ConnectionPool(object):
             self.client_heartbeats[host] = 0
         return self._connection_pool[host]
 
-    def _read(self):
+    def _read_from_server(self):
         while 1:
             try:
                 conns = self._connection_pool.values()
@@ -91,47 +91,50 @@ class ConnectionPool(object):
                 break
 
             for conn in readable:
-                host = conn.remote_host()
+                self._read(conn)
 
-                # 数据的头部大小为16个字节
-                head = conn.read(16)
-                if len(head) == 0:  # 连接已关闭
-                    logger.warn('{} closed'.format(host))
-                    del self._connection_pool[host]
-                    break
+    def _read(self, conn):
+        host = conn.remote_host()
 
-                heartbeat, body_length = get_body_length(head)
-                body = conn.read(body_length)
+        # 数据的头部大小为16个字节
+        head = conn.read(16)
+        if len(head) == 0:  # 连接已关闭
+            logger.warn('{} closed'.format(host))
+            del self._connection_pool[host]
+            return
 
-                # 远程主机发送的心跳请求数据包
-                if heartbeat == 2:
-                    logger.debug('❤️ -> {}'.format(conn.remote_host()))
-                    msg_id = head[4:12]
-                    heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
-                    conn.write(bytearray(heartbeat_response))
-                # 远程主机发送的心跳响应数据包
-                elif heartbeat == 1:
-                    logger.debug('❤️ -> {}'.format(conn.remote_host()))
-                    self.client_heartbeats[host] -= 1
-                # 普通的数据包
-                else:
-                    res = Response(body)
-                    flag = res.read_int()
-                    if flag == 2:  # 响应的值为NULL
-                        self.results[host] = None
-                    elif flag == 1:  # 正常的响应值
-                        result = res.read_next()
-                        self.results[host] = result
-                    elif flag == 0:  # 异常的响应值
-                        err = res.read_next()
-                        error = '\n{cause}: {detailMessage}\n'.format(**err)
-                        stack_trace = err['stackTrace']
-                        for trace in stack_trace:
-                            error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
-                        self.results[host] = DubboException(error)
-                    else:
-                        raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
-                    self.evt.set()  # 唤醒请求线程
+        heartbeat, body_length = get_body_length(head)
+        body = conn.read(body_length)
+
+        # 远程主机发送的心跳请求数据包
+        if heartbeat == 2:
+            logger.debug('❤️ -> {}'.format(conn.remote_host()))
+            msg_id = head[4:12]
+            heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
+            conn.write(bytearray(heartbeat_response))
+        # 远程主机发送的心跳响应数据包
+        elif heartbeat == 1:
+            logger.debug('❤️ -> {}'.format(conn.remote_host()))
+            self.client_heartbeats[host] -= 1
+        # 普通的数据包
+        else:
+            res = Response(body)
+            flag = res.read_int()
+            if flag == 2:  # 响应的值为NULL
+                self.results[host] = None
+            elif flag == 1:  # 正常的响应值
+                result = res.read_next()
+                self.results[host] = result
+            elif flag == 0:  # 异常的响应值
+                err = res.read_next()
+                error = '\n{cause}: {detailMessage}\n'.format(**err)
+                stack_trace = err['stackTrace']
+                for trace in stack_trace:
+                    error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
+                self.results[host] = DubboException(error)
+            else:
+                raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
+            self.evt.set()  # 唤醒请求线程
 
     def _send_heartbeat(self):
         """
