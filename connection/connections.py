@@ -38,10 +38,13 @@ class ConnectionPool(object):
         # 读写同步的锁
         self.__lock = threading.Lock()
 
-        thread = threading.Thread(target=self._read)
-        thread.start()
+        reading_thread = threading.Thread(target=self._read)
+        reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
+        reading_thread.start()
 
-        threading.Timer(10, self._send_heartbeat).start()
+        scanning_thread = threading.Thread(target=self._send_heartbeat)
+        scanning_thread.setDaemon(True)
+        scanning_thread.start()
 
     def get(self, host, request_param, threading_safe=True):
         conn = self._get_connection(host)
@@ -135,20 +138,23 @@ class ConnectionPool(object):
         客户端发送心跳消息
         :return:
         """
-        # 这玩意每次只能执行一次，所以需要反复的重新设定任务
-        threading.Timer(10, self._send_heartbeat).start()
-
-        for host in self._connection_pool.keys():
-            conn = self._connection_pool[host]
-            if time.time() - conn.last_active > 60:
-                if self.client_heartbeats[host] >= 3:
-                    # 先关闭连接，等待下次请求使用连接时再次创建连接
-                    conn.close()
-                    del self._connection_pool[host]
-                    continue
-                self.client_heartbeats[host] += 1
-                req = CLI_HEARTBEAT_REQ_HEAD + get_heartbeat_id() + CLI_HEARTBEAT_TAIL
-                conn.write(bytearray(req))
+        while 1:
+            starting = time.time()
+            for host in self._connection_pool.keys():
+                conn = self._connection_pool[host]
+                if time.time() - conn.last_active > 60:
+                    if self.client_heartbeats[host] >= 3:
+                        # 先关闭连接，等待下次请求使用连接时再次创建连接
+                        conn.close()
+                        del self._connection_pool[host]
+                        continue
+                    self.client_heartbeats[host] += 1
+                    req = CLI_HEARTBEAT_REQ_HEAD + get_heartbeat_id() + CLI_HEARTBEAT_TAIL
+                    conn.write(bytearray(req))
+            ending = time.time()
+            time_delta = ending - starting
+            if time_delta < 10:
+                time.sleep(10 - time_delta)
 
 
 connection_pool = ConnectionPool()
