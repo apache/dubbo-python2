@@ -31,22 +31,24 @@ class ConnectionPool(object):
         self.results = {}
         self.client_heartbeats = {}
         self.evt = threading.Event()
-
+        self.__lock = threading.Lock()
         threading.Timer(10, self._send_heartbeat).start()
 
-    def get(self, host, request_param):
+    def get(self, host, request_param, threading_safe=True):
         conn = self._get_connection(host)
-
         request = encode(request_param)
+
+        if threading_safe:
+            self.__lock.acquire()
+
         conn.write(request)
-        while 1:
+        while host not in self.results:
             self.evt.wait()
             self.evt.clear()
-            if host in self.results:
-                break
+        result = self.results.pop(host)
 
-        result = self.results[host]
-        del self.results[host]
+        if threading_safe:
+            self.__lock.release()
 
         if isinstance(result, DubboException):
             raise result

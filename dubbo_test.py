@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import json
+import threading
 import unittest
 
 import logging
@@ -17,12 +18,20 @@ def pretty_print(value):
 
 
 class TestDubbo(unittest.TestCase):
-    def test(self):
+    def setUp(self):
         init_log()  # 初始化日志配置，调用端需要自己配置日志属性
 
         zk = ZkRegister('127.0.0.1:2181')
-        dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
+        self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
         # dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
+
+    def tearDown(self):
+        # Do something to clear the test environment here.
+        pass
+
+    @unittest.skip('skip base test')
+    def test(self):
+        dubbo = self.dubbo
 
         pretty_print(dubbo.call('echo', ['张老师', '三', 19, 2000.0, True]))
         pretty_print(dubbo.call('echo1', '昊天金阙无上至尊自然妙有弥罗至真高天上圣大慈仁者玉皇赦罪锡福大天尊玄穹高上帝'))
@@ -61,6 +70,36 @@ class TestDubbo(unittest.TestCase):
         log.debug('1111')
         log.info('22222')
 
+    def _run_num(self):
+        dubbo = self.dubbo
+
+        self.assertEquals(200, dubbo.call('echo5', 200))
+        self.assertEquals(10000, dubbo.call('echo5', 10000))
+
+        self.assertEquals(0.0, dubbo.call('echo6', 0.0))
+        self.assertEquals(1.0, dubbo.call('echo6', 1.0))
+        self.assertEquals(100.0, dubbo.call('echo6', 100.0))
+        self.assertEquals(100000.0, dubbo.call('echo6', 100000.0))
+
+        self.assertEquals(10000000000, dubbo.call('echo7', 10000000000))
+        self.assertEquals(0, dubbo.call('echo7', 0))
+        self.assertEquals(100, dubbo.call('echo7', 100))
+        self.assertEquals(1000, dubbo.call('echo7', 1000))
+        self.assertEquals(100000, dubbo.call('echo7', 100000))
+
+    def test_multi_threading(self):
+        for i in range(10):
+            thread = threading.Thread(target=self._run_num)
+            thread.start()
+
+    @unittest.skip('skip performance test')
+    def test_performance(self):
+        for i in range(5000000):
+            self.dubbo.call('echo18')
+
 
 if __name__ == '__main__':
+    # test = TestDubbo()
+    # test.setUp()
+    # test.test_performance()
     unittest.main()
