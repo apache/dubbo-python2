@@ -16,7 +16,7 @@ from codec.decoder import Response, get_body_length
 from codec.encoder import encode
 from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
 from common.exceptions import DubboException, RegisterException
-from common.util import get_ip, get_pid, get_heartbeat_id
+from common.util import get_ip, get_pid, get_heartbeat_id, is_linux
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
 DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
@@ -37,6 +37,10 @@ class ConnectionPool(object):
         self.evt = threading.Event()
         # 读写同步的锁
         self.__lock = threading.Lock()
+
+        if is_linux():
+            self.__fds = {}
+            self.__epoll = select.epoll()
 
         reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
@@ -79,9 +83,20 @@ class ConnectionPool(object):
             ip, port = host.split(':')
             self._connection_pool[host] = Connection(ip, int(port))
             self.client_heartbeats[host] = 0
+            if is_linux():
+                conn = self._connection_pool[host]
+                self.__epoll.register(conn.fileno(), select.EPOLLIN)
+                self.__fds[conn.fileno()] = conn
         return self._connection_pool[host]
 
     def _read_from_server(self):
+        if is_linux():
+            while 1:
+                events = self.__epoll.poll(1)
+                for fd, event in events:
+                    if event & select.EPOLLIN:
+                        conn = self.__fds[fd]
+                        self._read(conn)
         while 1:
             try:
                 conns = self._connection_pool.values()
@@ -99,6 +114,8 @@ class ConnectionPool(object):
         # 数据的头部大小为16个字节
         head = conn.read(16)
         if len(head) == 0:  # 连接已关闭
+            if is_linux():
+                self.__epoll.unregister(conn.fileno())
             logger.warn('{} closed'.format(host))
             del self._connection_pool[host]
             return
@@ -147,6 +164,8 @@ class ConnectionPool(object):
                 conn = self._connection_pool[host]
                 if time.time() - conn.last_active > 60:
                     if self.client_heartbeats[host] >= 3:
+                        if is_linux():
+                            self.__epoll.unregister(conn.fileno())
                         # 先关闭连接，等待下次请求使用连接时再次创建连接
                         conn.close()
                         del self._connection_pool[host]

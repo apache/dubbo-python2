@@ -2,6 +2,7 @@
 import os
 import socket
 import struct
+from sys import platform
 
 ip = None
 heartbeat_id = 0
@@ -73,6 +74,12 @@ def get_heartbeat_id():
     return heartbeat_id_byte
 
 
+def is_linux():
+    if platform == "linux" or platform == "linux2":
+        return True
+    else:
+        return False
+
+
 if __name__ == '__main__':
-    for i in range(10):
-        print get_ip()
+    print platform
