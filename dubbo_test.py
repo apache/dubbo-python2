@@ -29,7 +29,7 @@ class TestDubbo(unittest.TestCase):
         # Do something to clear the test environment here.
         pass
 
-    @unittest.skip('skip base test')
+    # @unittest.skip('skip base test')
     def test(self):
         dubbo = self.dubbo
 
@@ -87,15 +87,16 @@ class TestDubbo(unittest.TestCase):
         self.assertEquals(1000, dubbo.call('echo7', 1000))
         self.assertEquals(100000, dubbo.call('echo7', 100000))
 
+    # @unittest.skip('skip performance test')
     def test_multi_threading(self):
         for i in range(10):
             thread = threading.Thread(target=self._run_num)
             thread.start()
 
-    @unittest.skip('skip performance test')
+    # @unittest.skip('skip performance test')
     def test_performance(self):
-        for i in range(5000000):
-            self.dubbo.call('echo18')
+        for i in range(10000):
+            print self.dubbo.call('echo18')
 
 
 if __name__ == '__main__':

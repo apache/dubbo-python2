@@ -20,7 +20,7 @@ class DubboClient(object):
             host = self.__zk_register.get_provider_host(self.__interface)
         else:
             host = self.__host
-        logger.debug('get host {}'.format(host))
+        # logger.debug('get host {}'.format(host))
 
         request_param = {
             'dubbo_version': self.__dubbo_version,

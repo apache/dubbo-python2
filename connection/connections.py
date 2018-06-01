@@ -8,6 +8,8 @@ import time
 from urlparse import urlparse, parse_qsl
 
 import logging
+
+import select
 from kazoo.client import KazooClient
 
 from codec.decoder import Response, get_body_length
@@ -29,9 +31,16 @@ class ConnectionPool(object):
         self._connection_pool = {}
         # 用于在多个线程之间保存结果
         self.results = {}
+        # 保存客户端已经发生超时的心跳次数
         self.client_heartbeats = {}
+        # 线程间同步的event
         self.evt = threading.Event()
+        # 读写同步的锁
         self.__lock = threading.Lock()
+
+        thread = threading.Thread(target=self._read)
+        thread.start()
+
         threading.Timer(10, self._send_heartbeat).start()
 
     def get(self, host, request_param, threading_safe=True):
@@ -67,55 +76,59 @@ class ConnectionPool(object):
             ip, port = host.split(':')
             self._connection_pool[host] = Connection(ip, int(port))
             self.client_heartbeats[host] = 0
-
-            # 创建连接后开始异步的读取此连接的数据
-            thread = threading.Thread(target=self._read, args=(host,))
-            thread.start()
         return self._connection_pool[host]
 
-    def _read(self, host):
-        conn = self._get_connection(host)
-
+    def _read(self):
         while 1:
-            # 数据的头部大小为16个字节
-            head = conn.read(16)
-            if len(head) == 0:  # 连接已关闭
-                logger.warn('{} closed'.format(host))
-                del self._connection_pool[host]
+            try:
+                conns = self._connection_pool.values()
+                readable, writeable, exceptional = select.select(conns, [], [], 0.5)
+            except select.error as e:
+                logger.error(e)
                 break
 
-            heartbeat, body_length = get_body_length(head)
-            body = conn.read(body_length)
+            for conn in readable:
+                host = conn.remote_host()
 
-            # 远程主机发送的心跳请求数据包
-            if heartbeat == 2:
-                logger.debug('❤️ -> {}'.format(conn.remote_host()))
-                msg_id = head[4:12]
-                heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
-                conn.write(bytearray(heartbeat_response))
-            # 远程主机发送的心跳响应数据包
-            elif heartbeat == 1:
-                logger.debug('❤️ -> {}'.format(conn.remote_host()))
-                self.client_heartbeats[host] -= 1
-            # 普通的数据包
-            else:
-                res = Response(body)
-                flag = res.read_int()
-                if flag == 2:  # 响应的值为NULL
-                    self.results[host] = None
-                elif flag == 1:  # 正常的响应值
-                    result = res.read_next()
-                    self.results[host] = result
-                elif flag == 0:  # 异常的响应值
-                    err = res.read_next()
-                    error = '\n{cause}: {detailMessage}\n'.format(**err)
-                    stack_trace = err['stackTrace']
-                    for trace in stack_trace:
-                        error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
-                    self.results[host] = DubboException(error)
+                # 数据的头部大小为16个字节
+                head = conn.read(16)
+                if len(head) == 0:  # 连接已关闭
+                    logger.warn('{} closed'.format(host))
+                    del self._connection_pool[host]
+                    break
+
+                heartbeat, body_length = get_body_length(head)
+                body = conn.read(body_length)
+
+                # 远程主机发送的心跳请求数据包
+                if heartbeat == 2:
+                    logger.debug('❤️ -> {}'.format(conn.remote_host()))
+                    msg_id = head[4:12]
+                    heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
+                    conn.write(bytearray(heartbeat_response))
+                # 远程主机发送的心跳响应数据包
+                elif heartbeat == 1:
+                    logger.debug('❤️ -> {}'.format(conn.remote_host()))
+                    self.client_heartbeats[host] -= 1
+                # 普通的数据包
                 else:
-                    raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
-                self.evt.set()  # 唤醒请求线程
+                    res = Response(body)
+                    flag = res.read_int()
+                    if flag == 2:  # 响应的值为NULL
+                        self.results[host] = None
+                    elif flag == 1:  # 正常的响应值
+                        result = res.read_next()
+                        self.results[host] = result
+                    elif flag == 0:  # 异常的响应值
+                        err = res.read_next()
+                        error = '\n{cause}: {detailMessage}\n'.format(**err)
+                        stack_trace = err['stackTrace']
+                        for trace in stack_trace:
+                            error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
+                        self.results[host] = DubboException(error)
+                    else:
+                        raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
+                    self.evt.set()  # 唤醒请求线程
 
     def _send_heartbeat(self):
         """
@@ -303,6 +316,13 @@ class Connection(object):
 
         self.__host = '{0}:{1}'.format(host, port)
         self.last_active = time.time()
+
+    def fileno(self):
+        """
+        https://stackoverflow.com/a/39328021/4614538
+        :return:
+        """
+        return self.__sock.fileno()
 
     def write(self, data):
         self.last_active = time.time()
