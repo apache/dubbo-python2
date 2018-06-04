@@ -25,7 +25,7 @@ DUBBO_ZK_CONFIGURATORS = '/dubbo/{}/configurators'
 logger = logging.getLogger('dubbo.py')
 
 
-class ConnectionPool(object):
+class BaseConnectionPool(object):
     def __init__(self):
         # 根据远程host保存与此host相关的连接
         self._connection_pool = {}
@@ -37,10 +37,6 @@ class ConnectionPool(object):
         self.evt = threading.Event()
         # 读写同步的锁
         self.__lock = threading.Lock()
-
-        if is_linux():
-            self.__fds = {}
-            self.__epoll = select.epoll()
 
         reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
@@ -80,44 +76,41 @@ class ConnectionPool(object):
         if not host or ':' not in host:
             raise ValueError('invalid host {}'.format(host))
         if host not in self._connection_pool:
-            ip, port = host.split(':')
-            self._connection_pool[host] = Connection(ip, int(port))
             self.client_heartbeats[host] = 0
-            if is_linux():
-                conn = self._connection_pool[host]
-                self.__epoll.register(conn.fileno(), select.EPOLLIN)
-                self.__fds[conn.fileno()] = conn
+            self._connection_pool[host] = self._new_connection(host)
         return self._connection_pool[host]
 
-    def _read_from_server(self):
-        if is_linux():
-            while 1:
-                events = self.__epoll.poll(1)
-                for fd, event in events:
-                    if event & select.EPOLLIN:
-                        conn = self.__fds[fd]
-                        self._read(conn)
-        while 1:
-            try:
-                conns = self._connection_pool.values()
-                readable, writeable, exceptional = select.select(conns, [], [], 0.5)
-            except select.error as e:
-                logger.error(e)
-                break
+    def _new_connection(self, host):
+        """
+        创建一个新的连接
+        :param host:
+        :return:
+        """
+        raise NotImplementedError()
 
-            for conn in readable:
-                self._read(conn)
+    def _delete_connection(self, conn):
+        """
+        移除一个连接
+        :param conn:
+        :return:
+        """
+        raise NotImplementedError()
+
+    def _read_from_server(self):
+        """
+        管理读取所有远程主机的数据
+        :return:
+        """
+        raise NotImplementedError()
 
     def _read(self, conn):
         host = conn.remote_host()
 
         # 数据的头部大小为16个字节
         head = conn.read(16)
-        if len(head) == 0:  # 连接已关闭
-            if is_linux():
-                self.__epoll.unregister(conn.fileno())
-            logger.warn('{} closed'.format(host))
-            del self._connection_pool[host]
+        if not head:  # 连接已关闭
+            logger.warn('{} closed by remote server'.format(host))
+            self._delete_connection(conn)
             return
 
         heartbeat, body_length = get_body_length(head)
@@ -164,11 +157,9 @@ class ConnectionPool(object):
                 conn = self._connection_pool[host]
                 if time.time() - conn.last_active > 60:
                     if self.client_heartbeats[host] >= 3:
-                        if is_linux():
-                            self.__epoll.unregister(conn.fileno())
-                        # 先关闭连接，等待下次请求使用连接时再次创建连接
-                        conn.close()
-                        del self._connection_pool[host]
+                        self._delete_connection(conn)
+                        conn.close()  # 客户端主动关闭连接
+                        logger.warn('{} closed by client'.format(host))
                         continue
                     self.client_heartbeats[host] += 1
                     req = CLI_HEARTBEAT_REQ_HEAD + get_heartbeat_id() + CLI_HEARTBEAT_TAIL
@@ -179,7 +170,65 @@ class ConnectionPool(object):
                 time.sleep(10 - time_delta)
 
 
-connection_pool = ConnectionPool()
+class EpollConnectionPool(BaseConnectionPool):
+    """
+    epoll模型只支持Linux及其发行版
+    """
+
+    def __init__(self):
+        self.__fds = {}
+        self.__epoll = select.epoll()
+        BaseConnectionPool.__init__(self)
+
+    def _read_from_server(self):
+        while 1:
+            events = self.__epoll.poll(1)
+            for fd, event in events:
+                if event & select.EPOLLIN:
+                    conn = self.__fds[fd]
+                    self._read(conn)
+
+    def _new_connection(self, host):
+        ip, port = host.split(':')
+        conn = Connection(ip, int(port))
+        self.__epoll.register(conn.fileno(), select.EPOLLIN)
+        self.__fds[conn.fileno()] = conn
+        return conn
+
+    def _delete_connection(self, conn):
+        self.__epoll.unregister(conn.fileno())
+        host = conn.remote_host()
+        del self._connection_pool[host]
+
+
+class SelectConnectionPool(BaseConnectionPool):
+    """
+    select模型支持大多数的现代操作系统
+    """
+
+    def _read_from_server(self):
+        while 1:
+            try:
+                conns = self._connection_pool.values()
+                readable, writeable, exceptional = select.select(conns, [], [], 0.5)
+            except select.error as e:
+                logger.error(e)
+                break
+            for conn in readable:
+                self._read(conn)
+
+    def _new_connection(self, host):
+        ip, port = host.split(':')
+        return Connection(ip, int(port))
+
+    def _delete_connection(self, conn):
+        del self._connection_pool[conn.remote_host()]
+
+
+if is_linux():
+    connection_pool = EpollConnectionPool()
+else:
+    connection_pool = SelectConnectionPool()
 
 
 class ZkRegister(object):
