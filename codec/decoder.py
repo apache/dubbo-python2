@@ -83,6 +83,8 @@ class Response(object):
         读取一个字节并向后移动一位指针
         :return:
         """
+        if self.__index >= len(self.__data):
+            raise ValueError('Index {} bigger than data length {}'.format(self.__index, len(self.__data)))
         value = self.__data[self.__index]
         self.__index += 1
         return value
