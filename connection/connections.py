@@ -77,7 +77,7 @@ class BaseConnectionPool(object):
             raise ValueError('invalid host {}'.format(host))
         if host not in self._connection_pool:
             self.client_heartbeats[host] = 0
-            self._connection_pool[host] = self._new_connection(host)
+            self._new_connection(host)
         return self._connection_pool[host]
 
     def _new_connection(self, host):
@@ -176,7 +176,7 @@ class EpollConnectionPool(BaseConnectionPool):
     """
 
     def __init__(self):
-        self.__fds = {}
+        self.__fds = {}  # 文件描述符所对应的连接
         self.__epoll = select.epoll()
         BaseConnectionPool.__init__(self)
 
@@ -193,7 +193,8 @@ class EpollConnectionPool(BaseConnectionPool):
         conn = Connection(ip, int(port))
         self.__epoll.register(conn.fileno(), select.EPOLLIN)
         self.__fds[conn.fileno()] = conn
-        return conn
+
+        self._connection_pool[host] = conn
 
     def _delete_connection(self, conn):
         self.__epoll.unregister(conn.fileno())
@@ -206,11 +207,15 @@ class SelectConnectionPool(BaseConnectionPool):
     select模型支持大多数的现代操作系统
     """
 
+    def __init__(self):
+        self.select_timeout = 0.5  # select模型超时时间
+        BaseConnectionPool.__init__(self)
+
     def _read_from_server(self):
         while 1:
             try:
                 conns = self._connection_pool.values()
-                readable, writeable, exceptional = select.select(conns, [], [], 0.5)
+                readable, writeable, exceptional = select.select(conns, [], [], self.select_timeout)
             except select.error as e:
                 logger.error(e)
                 break
@@ -219,7 +224,9 @@ class SelectConnectionPool(BaseConnectionPool):
 
     def _new_connection(self, host):
         ip, port = host.split(':')
-        return Connection(ip, int(port))
+        self._connection_pool[host] = Connection(ip, int(port))
+        # 保证select模型已经开始监听最新加入的这个fd的读事件，否则可能会导致此fd读事件丢失
+        time.sleep(self.select_timeout)
 
     def _delete_connection(self, conn):
         del self._connection_pool[conn.remote_host()]
