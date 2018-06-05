@@ -37,6 +37,8 @@ class BaseConnectionPool(object):
         self.evt = threading.Event()
         # 读写同步的锁
         self.__lock = threading.Lock()
+        # 创建连接的锁
+        self.__conn_lock = threading.Lock()
 
         reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
@@ -46,12 +48,11 @@ class BaseConnectionPool(object):
         scanning_thread.setDaemon(True)
         scanning_thread.start()
 
-    def get(self, host, request_param, threading_safe=True):
+    def get(self, host, request_param):
         conn = self._get_connection(host)
         request = encode(request_param)
 
-        if threading_safe:
-            self.__lock.acquire()
+        self.__lock.acquire()
 
         conn.write(request)
         while host not in self.results:
@@ -59,8 +60,7 @@ class BaseConnectionPool(object):
             self.evt.clear()
         result = self.results.pop(host)
 
-        if threading_safe:
-            self.__lock.release()
+        self.__lock.release()
 
         if isinstance(result, DubboException):
             raise result
@@ -76,8 +76,11 @@ class BaseConnectionPool(object):
         if not host or ':' not in host:
             raise ValueError('invalid host {}'.format(host))
         if host not in self._connection_pool:
-            self.client_heartbeats[host] = 0
-            self._new_connection(host)
+            self.__conn_lock.acquire()
+            if host not in self._connection_pool:
+                self.client_heartbeats[host] = 0
+                self._new_connection(host)
+            self.__conn_lock.release()
         return self._connection_pool[host]
 
     def _new_connection(self, host):

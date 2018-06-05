@@ -19,6 +19,6 @@ if __name__ == '__main__':
 
     print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])
 
-    for i in range(3):
+    for i in range(10):
         thread = threading.Thread(target=run, args=(dubbo,))
         thread.start()
