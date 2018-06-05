@@ -118,13 +118,13 @@ class BaseConnectionPool(object):
 
         # 远程主机发送的心跳请求数据包
         if heartbeat == 2:
-            logger.debug('❤️ -> {}'.format(conn.remote_host()))
+            logger.debug('❤️ request  -> {}'.format(conn.remote_host()))
             msg_id = head[4:12]
             heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
             conn.write(bytearray(heartbeat_response))
         # 远程主机发送的心跳响应数据包
         elif heartbeat == 1:
-            logger.debug('❤️ -> {}'.format(conn.remote_host()))
+            logger.debug('❤ response️ -> {}'.format(conn.remote_host()))
             self.client_heartbeats[host] -= 1
         # 普通的数据包
         else:
@@ -421,6 +421,9 @@ class Connection(object):
         self.__sock.close()
 
     def remote_host(self):
+        return self.__host
+
+    def __repr__(self):
         return self.__host
 
 
