@@ -33,8 +33,6 @@ class BaseConnectionPool(object):
         self.results = {}
         # 保存客户端已经发生超时的心跳次数
         self.client_heartbeats = {}
-        # 线程间同步的event
-        self.evt = threading.Event()
         # 创建连接的锁
         self.__conn_lock = threading.Lock()
 
@@ -50,13 +48,10 @@ class BaseConnectionPool(object):
         conn = self._get_connection(host)
         request = encode(request_param)
 
-        conn.lock()
-        conn.write(request)
-        while host not in self.results:
-            self.evt.wait()
-            self.evt.clear()
-        result = self.results.pop(host)
-        conn.unlock()
+        with conn:
+            conn.write(request)
+            conn.wait()
+            result = self.results.pop(host)
 
         if isinstance(result, DubboException):
             raise result
@@ -117,13 +112,13 @@ class BaseConnectionPool(object):
 
         # 远程主机发送的心跳请求数据包
         if heartbeat == 2:
-            logger.debug('❤️ request  -> {}'.format(conn.remote_host()))
+            logger.debug('❤ request  -> {}'.format(conn.remote_host()))
             msg_id = head[4:12]
             heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
             conn.write(bytearray(heartbeat_response))
         # 远程主机发送的心跳响应数据包
         elif heartbeat == 1:
-            logger.debug('❤ response️ -> {}'.format(conn.remote_host()))
+            logger.debug('❤ response -> {}'.format(conn.remote_host()))
             self.client_heartbeats[host] -= 1
         # 普通的数据包
         else:
@@ -143,7 +138,7 @@ class BaseConnectionPool(object):
                 self.results[host] = DubboException(error)
             else:
                 raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
-            self.evt.set()  # 唤醒请求线程
+            conn.notify()  # 唤醒请求线程
 
     def _send_heartbeat(self):
         """
@@ -397,6 +392,7 @@ class Connection(object):
         sock.connect((host, port))
         self.__sock = sock
         self.__lock = threading.Lock()
+        self.__event = threading.Event()
 
         self.__host = '{0}:{1}'.format(host, port)
         self.last_active = time.time()
@@ -424,10 +420,30 @@ class Connection(object):
         return self.__host
 
     def lock(self):
+        logger.debug('{} locked'.format(self.__host))
         return self.__lock.acquire()
 
     def unlock(self):
+        logger.debug('{} unlocked'.format(self.__host))
         self.__lock.release()
+
+    def wait(self):
+        logger.debug('{} waiting'.format(self.__host))
+        # 如果notify更早的发生，将导致is_set为True，此时不再需要wait
+        if not self.__event.is_set():
+            self.__event.wait()
+        # 为下一次的操作做初始化
+        self.__event.clear()
+
+    def notify(self):
+        logger.debug('{} notified'.format(self.__host))
+        self.__event.set()
+
+    def __enter__(self):
+        return self.lock()
+
+    def __exit__(self, *unused):
+        self.unlock()
 
     def __repr__(self):
         return self.__host
