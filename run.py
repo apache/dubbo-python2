@@ -14,7 +14,7 @@ def run(_dubbo):
 if __name__ == '__main__':
     init_log()  # 初始化日志配置，调用端需要自己配置日志属性
 
-    zk = ZkRegister('127.0.0.1:2181')
+    zk = ZkRegister('172.19.65.33:2181')
     dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
 
     print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])

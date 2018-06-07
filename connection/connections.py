@@ -35,8 +35,6 @@ class BaseConnectionPool(object):
         self.client_heartbeats = {}
         # 线程间同步的event
         self.evt = threading.Event()
-        # 读写同步的锁
-        self.__lock = threading.Lock()
         # 创建连接的锁
         self.__conn_lock = threading.Lock()
 
@@ -52,15 +50,13 @@ class BaseConnectionPool(object):
         conn = self._get_connection(host)
         request = encode(request_param)
 
-        self.__lock.acquire()
-
+        conn.lock()
         conn.write(request)
         while host not in self.results:
             self.evt.wait()
             self.evt.clear()
         result = self.results.pop(host)
-
-        self.__lock.release()
+        conn.unlock()
 
         if isinstance(result, DubboException):
             raise result
@@ -400,6 +396,7 @@ class Connection(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
         self.__sock = sock
+        self.__lock = threading.Lock()
 
         self.__host = '{0}:{1}'.format(host, port)
         self.last_active = time.time()
@@ -425,6 +422,12 @@ class Connection(object):
 
     def remote_host(self):
         return self.__host
+
+    def lock(self):
+        return self.__lock.acquire()
+
+    def unlock(self):
+        self.__lock.release()
 
     def __repr__(self):
         return self.__host
