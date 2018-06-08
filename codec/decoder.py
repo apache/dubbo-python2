@@ -360,7 +360,7 @@ class Response(object):
             timestamp *= 60000
         else:
             raise HessianTypeError('{0} is not date type'.format(value))
-        return datetime.fromtimestamp(timestamp / 1e3).strftime("%Y-%m-%dT%H:%M:%S+0800")
+        return datetime.fromtimestamp(timestamp / 1e3).strftime("%Y-%m-%dT%H:%M:%S.%f+0800")
 
     @ranges(0x51)
     def read_ref(self):

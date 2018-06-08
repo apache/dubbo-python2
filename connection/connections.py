@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import socket
 import threading
+import traceback
 from random import randint
 from urllib import unquote, quote
 
@@ -122,23 +123,28 @@ class BaseConnectionPool(object):
             self.client_heartbeats[host] -= 1
         # 普通的数据包
         else:
-            res = Response(body)
-            flag = res.read_int()
-            if flag == 2:  # 响应的值为NULL
-                self.results[host] = None
-            elif flag == 1:  # 正常的响应值
-                result = res.read_next()
-                self.results[host] = result
-            elif flag == 0:  # 异常的响应值
-                err = res.read_next()
-                error = '\n{cause}: {detailMessage}\n'.format(**err)
-                stack_trace = err['stackTrace']
-                for trace in stack_trace:
-                    error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
-                self.results[host] = DubboException(error)
-            else:
-                raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
-            conn.notify()  # 唤醒请求线程
+            try:
+                res = Response(body)
+                flag = res.read_int()
+                if flag == 2:  # 响应的值为NULL
+                    self.results[host] = None
+                elif flag == 1:  # 正常的响应值
+                    result = res.read_next()
+                    self.results[host] = result
+                elif flag == 0:  # 异常的响应值
+                    err = res.read_next()
+                    error = '\n{cause}: {detailMessage}\n'.format(**err)
+                    stack_trace = err['stackTrace']
+                    for trace in stack_trace:
+                        error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
+                    self.results[host] = DubboException(error)
+                else:
+                    raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
+            except Exception as e:
+                traceback.print_exc()
+                raise e
+            finally:
+                conn.notify()  # 唤醒请求线程
 
     def _send_heartbeat(self):
         """
@@ -392,6 +398,7 @@ class Connection(object):
         sock.connect((host, port))
         self.__sock = sock
         self.__lock = threading.Lock()
+        # Event是Condition的简单实现版本
         self.__event = threading.Event()
 
         self.__host = '{0}:{1}'.format(host, port)
@@ -420,15 +427,12 @@ class Connection(object):
         return self.__host
 
     def lock(self):
-        logger.debug('{} locked'.format(self.__host))
         return self.__lock.acquire()
 
     def unlock(self):
-        logger.debug('{} unlocked'.format(self.__host))
         self.__lock.release()
 
     def wait(self):
-        logger.debug('{} waiting'.format(self.__host))
         # 如果notify更早的发生，将导致is_set为True，此时不再需要wait
         if not self.__event.is_set():
             self.__event.wait()
@@ -436,7 +440,6 @@ class Connection(object):
         self.__event.clear()
 
     def notify(self):
-        logger.debug('{} notified'.format(self.__host))
         self.__event.set()
 
     def __enter__(self):

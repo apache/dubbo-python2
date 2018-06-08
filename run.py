@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
+import json
 import threading
 
 from common.loggers import init_log
 from connection.connections import ZkRegister
 from dubbo import DubboClient
+
+
+def pretty_print(value):
+    print json.dumps(value, ensure_ascii=False, indent=4, sort_keys=True)
 
 
 def run(_dubbo):
@@ -16,10 +21,13 @@ if __name__ == '__main__':
 
     zk = ZkRegister('172.19.65.33:2181')
     # dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
-    dubbo = DubboClient('me.hourui.echo.provider.Echo', host='172.21.4.98:20882')
+    dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20882')
 
-    print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])
+    result = dubbo.call('echo20')
+    pretty_print(result)
 
-    for i in range(10):
-        thread = threading.Thread(target=run, args=(dubbo,))
-        thread.start()
+    # print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])
+    #
+    # for i in range(10):
+    #     thread = threading.Thread(target=run, args=(dubbo,))
+    #     thread.start()
