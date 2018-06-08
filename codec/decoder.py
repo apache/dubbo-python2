@@ -58,11 +58,10 @@ class Response(object):
 
     def __init__(self, data):
         self.__data = data  # data是字节数组
-        self.__index = 0  # 当前索引的位置
-
-        self.types = []  # 保存所有通过read_type解析出来的type
-        self.ref = []  # 保存所有的引用类型的类名
-        self.classes = {}  # 保存类名和类里面的变量之间的关系
+        self.__index = 0
+        self.types = []
+        self.objects = []
+        self.field_names = []
 
     def get_byte(self):
         """
@@ -209,17 +208,17 @@ class Response(object):
         :return:
         """
         result = {}
-
+        self.objects.append(result)
         value = self.read_byte()
         if 0x60 <= value <= 0x6f:
             ref = value - 0x60
-            field_names = self.classes[self.ref[ref]]
+            field_names = self.field_names[ref]
             for field_name in field_names:
                 field_value = self.read_next()
                 result[field_name] = field_value
         elif value == ord('O'):
             ref = self.read_int()
-            field_names = self.classes[self.ref[ref]]
+            field_names = self.field_names[ref]
             for field_name in field_names:
                 field_value = self.read_next()
                 result[field_name] = field_value
@@ -230,15 +229,11 @@ class Response(object):
             field_names = []
             for i in range(field_length):
                 field_names.append(self.read_string())
-
-            self.ref.append(path)
-            self.classes[path] = field_names
+            self.field_names.append(field_names)
 
             what_the_fuck = self.read_byte()
-
             for field_name in field_names:
                 result[field_name] = self.read_next()
-
         return result
 
     def read_type(self):
@@ -262,7 +257,7 @@ class Response(object):
         :return:
         """
         result = []
-
+        self.objects.append(result)
         value = self.read_byte()
         if 0x70 <= value <= 0x77:
             _type = self.read_type()  # type对于Python来说没有用处
@@ -288,7 +283,6 @@ class Response(object):
             length = self.read_int()
             for i in range(length):
                 result.append(self.read_next())
-
         return result
 
     @ranges((0xd8, 0xff), (0x38, 0x3f), 0x59, ord('L'))
@@ -337,6 +331,7 @@ class Response(object):
 
         if value == ord('M') or value == ord('H'):
             result = {}
+            self.objects.append(result)
             while self.get_byte() != ord('Z'):
                 key = self.read_next()
                 value = self.read_next()
@@ -365,12 +360,12 @@ class Response(object):
     @ranges(0x51)
     def read_ref(self):
         """
-        读取一个引用类型
+        读取一个已知的object/list/map
         :return:
         """
         self.read_byte()  # 干掉0x51
         ref_id = self.read_int()
-        return self.ref[ref_id]
+        return self.objects[ref_id]
 
     def read_next(self):
         """
