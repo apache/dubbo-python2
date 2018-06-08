@@ -243,7 +243,7 @@ class Response(object):
 
     def read_type(self):
         """
-        读取一个type
+        type代表了list或者map中泛型的类型，在Python中此类型无意义
         :return:
         """
         _type = self.read_next()
