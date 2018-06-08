@@ -16,7 +16,7 @@ from kazoo.client import KazooClient
 from codec.decoder import Response, get_body_length
 from codec.encoder import encode
 from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
-from common.exceptions import DubboException, RegisterException
+from common.exceptions import DubboException, RegisterException, DubboResponseException
 from common.util import get_ip, get_pid, get_heartbeat_id, is_linux
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
@@ -54,7 +54,7 @@ class BaseConnectionPool(object):
             conn.wait()
             result = self.results.pop(host)
 
-        if isinstance(result, DubboException):
+        if isinstance(result, Exception):
             raise result
 
         return result
@@ -108,7 +108,16 @@ class BaseConnectionPool(object):
             self._delete_connection(conn)
             return
 
-        heartbeat, body_length = get_body_length(head)
+        try:
+            heartbeat, body_length = get_body_length(head)
+        except DubboResponseException as e:
+            # 如果是服务端的响应发生了异常
+            # 1. 保存异常
+            # 2. 唤醒该连接上正在等待的请求线程
+            # 3. 读操作返回
+            self.results[host] = e
+            conn.notify()
+            return
         body = conn.read(body_length)
 
         # 远程主机发送的心跳请求数据包
@@ -137,12 +146,11 @@ class BaseConnectionPool(object):
                     stack_trace = err['stackTrace']
                     for trace in stack_trace:
                         error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
-                    self.results[host] = DubboException(error)
+                    self.results[host] = DubboResponseException(error)
                 else:
-                    raise DubboException("Unknown result flag, expect '0' '1' '2', get " + flag)
+                    raise DubboResponseException("Unknown result flag, expect '0' '1' '2', get " + flag)
             except Exception as e:
-                traceback.print_exc()
-                raise e
+                self.results[host] = e
             finally:
                 conn.notify()  # 唤醒请求线程
 

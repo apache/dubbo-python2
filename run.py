@@ -23,7 +23,7 @@ if __name__ == '__main__':
     # dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
     dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20882')
 
-    result = dubbo.call('echo21')
+    result = dubbo.call('echo35')
     pretty_print(result)
 
     # print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])

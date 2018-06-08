@@ -4,7 +4,7 @@ from datetime import datetime
 import struct
 
 from common.constants import response_status_message
-from common.exceptions import HessianTypeError, DubboException
+from common.exceptions import HessianTypeError, DubboException, DubboResponseException
 from common.util import byte_list_2_num
 
 functions = {}
@@ -405,7 +405,7 @@ def get_body_length(response_head):
         heartbeat = 0
         response_status = response_head[3]
         if response_status != 20:
-            raise DubboException(response_status_message[response_status])
+            raise DubboResponseException(response_status_message[response_status])
     return heartbeat, byte_list_2_num(response_head[12:])
 
 
