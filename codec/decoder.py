@@ -376,6 +376,29 @@ class Response(object):
         func = functions[data_type]
         return func(self)
 
+    def read_error(self):
+        """
+        解析Java的错误信息，因为需要知道错误的类型，所以需要单独处理
+        :return:
+        """
+        self.read_byte()
+        error_type = self.read_string()
+
+        field_length = self.read_int()
+        field_names = []
+        for i in range(field_length):
+            field_names.append(self.read_string())
+        self.field_names.append(field_names)
+        field_names.remove('cause')
+
+        result = {'cause': error_type}
+        self.objects.append(result)
+
+        self.read_byte()
+        for field_name in field_names:
+            result[field_name] = self.read_next()
+        return result
+
     def __repr__(self):
         return str(self.__data)
 

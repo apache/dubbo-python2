@@ -141,11 +141,11 @@ class BaseConnectionPool(object):
                     result = res.read_next()
                     self.results[host] = result
                 elif flag == 0:  # 异常的响应值
-                    err = res.read_next()
+                    err = res.read_error()
                     error = '\n{cause}: {detailMessage}\n'.format(**err)
-                    stack_trace = err['stackTrace']
-                    for trace in stack_trace:
-                        error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
+                    exceptions = err['suppressedExceptions']
+                    for exception in exceptions:
+                        error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**exception)
                     self.results[host] = DubboResponseException(error)
                 else:
                     raise DubboResponseException("Unknown result flag, expect '0' '1' '2', get " + flag)
