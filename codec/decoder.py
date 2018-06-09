@@ -201,7 +201,7 @@ class Response(object):
         buf.extend(self._read_utf(length))
         return str(bytearray(buf))
 
-    @ranges((0x60, 0x6f), ord('O'), ord('C'))
+    @ranges((0x60, 0x6f), ord('O'))
     def read_object(self):
         """
         读取一个对象
@@ -212,29 +212,29 @@ class Response(object):
         value = self.read_byte()
         if 0x60 <= value <= 0x6f:
             ref = value - 0x60
-            field_names = self.field_names[ref]
-            for field_name in field_names:
-                field_value = self.read_next()
-                result[field_name] = field_value
-        elif value == ord('O'):
+        else:
             ref = self.read_int()
-            field_names = self.field_names[ref]
-            for field_name in field_names:
-                field_value = self.read_next()
-                result[field_name] = field_value
-        elif value == ord('C'):
-            path = self.read_string()
-
-            field_length = self.read_int()
-            field_names = []
-            for i in range(field_length):
-                field_names.append(self.read_string())
-            self.field_names.append(field_names)
-
-            what_the_fuck = self.read_byte()
-            for field_name in field_names:
-                result[field_name] = self.read_next()
+        field_names = self.field_names[ref]
+        for field_name in field_names:
+            field_value = self.read_next()
+            result[field_name] = field_value
         return result
+
+    @ranges(ord('C'))
+    def read_class(self):
+        """
+        读取一个类的类属性，主要是类名和类中的变量名
+        :return:
+        """
+        self.read_byte()
+        path = self.read_string()  # 类型名称在Python中并没有使用到
+
+        field_length = self.read_int()
+        field_names = []
+        for i in range(field_length):
+            field_names.append(self.read_string())
+        self.field_names.append(field_names)
+        return self.read_object()
 
     def read_type(self):
         """
@@ -389,15 +389,10 @@ class Response(object):
         for i in range(field_length):
             field_names.append(self.read_string())
         self.field_names.append(field_names)
-        field_names.remove('cause')
 
-        result = {'cause': error_type}
-        self.objects.append(result)
-
-        self.read_byte()
-        for field_name in field_names:
-            result[field_name] = self.read_next()
-        return result
+        error = self.read_object()
+        error['cause'] = error_type
+        return error
 
     def __repr__(self):
         return str(self.__data)
