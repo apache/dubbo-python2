@@ -24,7 +24,7 @@ if __name__ == '__main__':
     dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20882')
 
     # result = dubbo.call('echo7', -10000000000)
-    result = dubbo.call('echo6', 100000.0)
+    result = dubbo.call('echo6', 10000000.001)
     pretty_print(result)
 
     # print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])

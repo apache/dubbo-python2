@@ -134,7 +134,7 @@ def _encode_single_value(value):
                 return result
 
         mills = int(value * 1000)
-        if 0.001 * mills == value:
+        if 0.001 * mills == value and -2147483648 <= mills <= 2147483647:
             result.append(BC_DOUBLE_MILL)
             result.append(mills >> 24)
             result.append(mills >> 16)
