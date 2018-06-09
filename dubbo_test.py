@@ -80,6 +80,8 @@ class TestDubbo(unittest.TestCase):
     def _run_num(self):
         dubbo = self.dubbo
 
+        self.assertEquals(-200, dubbo.call('echo5', -200))
+        self.assertEquals(-10000, dubbo.call('echo5', -10000))
         self.assertEquals(200, dubbo.call('echo5', 200))
         self.assertEquals(10000, dubbo.call('echo5', 10000))
 
@@ -93,6 +95,17 @@ class TestDubbo(unittest.TestCase):
         self.assertEquals(100, dubbo.call('echo7', 100))
         self.assertEquals(1000, dubbo.call('echo7', 1000))
         self.assertEquals(100000, dubbo.call('echo7', 100000))
+
+        self.assertEquals(3.1415926, dubbo.call('echo6', 3.1415926))
+
+        self.assertEquals(-1.0, dubbo.call('echo6', -1.0))
+        self.assertEquals(-100.0, dubbo.call('echo6', -100.0))
+        self.assertEquals(-100000.0, dubbo.call('echo6', -100000.0))
+
+        self.assertEquals(-10000000000, dubbo.call('echo7', -10000000000))
+        self.assertEquals(-100, dubbo.call('echo7', -100))
+        self.assertEquals(-1000, dubbo.call('echo7', -1000))
+        self.assertEquals(-100000, dubbo.call('echo7', -100000))
 
     # @unittest.skip('skip performance test')
     def test_multi_threading(self):

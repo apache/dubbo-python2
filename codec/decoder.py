@@ -146,13 +146,13 @@ class Response(object):
         elif value == 0x5c:
             result = 1.0
         elif value == 0x5d:
-            result = float(byte_list_2_num(self.read_bytes(1)))
+            result = float(struct.unpack('!b', self.read_bytes(1))[0])
         elif value == 0x5e:
-            result = float(byte_list_2_num(self.read_bytes(2)))
+            result = float(struct.unpack('!h', self.read_bytes(2))[0])
         elif value == 0x5f:
-            result = float(byte_list_2_num(self.read_bytes(4)) / 1000)
+            result = float(struct.unpack('!i', self.read_bytes(4))[0]) * 0.001
         elif value == ord('D'):
-            result = struct.unpack('>d', self.read_bytes(8))[0]
+            result = float(struct.unpack('!d', self.read_bytes(8))[0])
         else:
             raise HessianTypeError('{0} is not a float'.format(value))
         return result
