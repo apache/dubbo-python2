@@ -66,6 +66,13 @@ class TestDubbo(unittest.TestCase):
             pretty_print(dubbo.call('echo17'))
             self.assertTrue('This is broken' in context.exception)
 
+        pretty_print(dubbo.call('echo18'))
+        pretty_print(dubbo.call('echo19'))
+        pretty_print(dubbo.call('echo20'))
+        pretty_print(dubbo.call('echo21'))
+        pretty_print(dubbo.call('echo22'))
+        pretty_print(dubbo.call('echo23'))
+
         log = logging.getLogger('dubbo.py')
         log.debug('1111')
         log.info('22222')
@@ -96,7 +103,7 @@ class TestDubbo(unittest.TestCase):
     # @unittest.skip('skip performance test')
     def test_performance(self):
         for i in range(10000):
-            print self.dubbo.call('echo18')
+            self.dubbo.call('echo18')
 
 
 if __name__ == '__main__':
