@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 
-import struct
+from struct import unpack
 
 from common.constants import response_status_message
 from common.exceptions import HessianTypeError, DubboException, DubboResponseException
-from common.util import byte_list_2_num
 
 functions = {}
 
@@ -131,7 +130,7 @@ class Response(object):
             i |= self.read_byte()
             result = i
         else:
-            result = byte_list_2_num(self.read_bytes(4))
+            result = unpack('!i', self.read_bytes(4))[0]
         return result
 
     @ranges((0x5b, 0x5f), ord('D'))
@@ -146,13 +145,13 @@ class Response(object):
         elif value == 0x5c:
             result = 1.0
         elif value == 0x5d:
-            result = float(struct.unpack('!b', self.read_bytes(1))[0])
+            result = float(unpack('!b', self.read_bytes(1))[0])
         elif value == 0x5e:
-            result = float(struct.unpack('!h', self.read_bytes(2))[0])
+            result = float(unpack('!h', self.read_bytes(2))[0])
         elif value == 0x5f:
-            result = float(struct.unpack('!i', self.read_bytes(4))[0]) * 0.001
+            result = float(unpack('!i', self.read_bytes(4))[0]) * 0.001
         elif value == ord('D'):
-            result = float(struct.unpack('!d', self.read_bytes(8))[0])
+            result = float(unpack('!d', self.read_bytes(8))[0])
         else:
             raise HessianTypeError('{0} is not a float'.format(value))
         return result
@@ -187,12 +186,12 @@ class Response(object):
         value = self.read_byte()
         buf = []
         while value == 0x52:
-            length = byte_list_2_num(self.read_bytes(2))
+            length = unpack('!h', self.read_bytes(2))[0]
             buf.extend(self._read_utf(length))
             value = self.read_byte()
 
         if value == ord('S'):
-            length = byte_list_2_num(self.read_bytes(2))
+            length = unpack('!h', self.read_bytes(2))[0]
         elif 0x00 <= value <= 0x1f:
             length = value
         else:
@@ -302,9 +301,9 @@ class Response(object):
             i |= self.read_byte()
             result = i
         elif value == 0x59:
-            result = struct.unpack('>i', self.read_bytes(4))[0]
+            result = unpack('!i', self.read_bytes(4))[0]
         elif value == ord('L'):
-            result = struct.unpack('>q', self.read_bytes(8))[0]
+            result = unpack('!q', self.read_bytes(8))[0]
         else:
             raise HessianTypeError('{0} is not long type'.format(value))
         return result
@@ -349,9 +348,9 @@ class Response(object):
         """
         value = self.read_byte()
         if value == 0x4a:
-            timestamp = byte_list_2_num(self.read_bytes(8))
+            timestamp = unpack('!q', self.read_bytes(8))[0]
         elif value == 0x4b:
-            timestamp = byte_list_2_num(self.read_bytes(4))
+            timestamp = unpack('!i', self.read_bytes(4))[0]
             timestamp *= 60000
         else:
             raise HessianTypeError('{0} is not date type'.format(value))
@@ -424,7 +423,7 @@ def get_body_length(response_head):
         response_status = response_head[3]
         if response_status != 20:
             raise DubboResponseException(response_status_message[response_status])
-    return heartbeat, byte_list_2_num(response_head[12:])
+    return heartbeat, unpack('!i', response_head[12:])[0]
 
 
 if __name__ == '__main__':

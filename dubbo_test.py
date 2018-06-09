@@ -66,6 +66,7 @@ class TestDubbo(unittest.TestCase):
             pretty_print(dubbo.call('echo17'))
             self.assertTrue('This is broken' in context.exception)
 
+        pretty_print(dubbo.call('echo1', 'hello'))
         pretty_print(dubbo.call('echo18'))
         pretty_print(dubbo.call('echo19'))
         pretty_print(dubbo.call('echo20'))
