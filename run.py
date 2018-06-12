@@ -21,10 +21,10 @@ if __name__ == '__main__':
 
     zk = ZkRegister('172.19.65.33:2181')
     # dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
-    dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20882')
+    dubbo = DubboClient('me.hourui.echo.provider.Echo', host='172.21.4.98:20882')
 
     # result = dubbo.call('echo7', -10000000000)
-    result = dubbo.call('echo6', 10000000.001)
+    result = dubbo.call('echo23')
     pretty_print(result)
 
     # print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])

@@ -3,6 +3,7 @@ import socket
 import threading
 import traceback
 from random import randint
+from struct import unpack
 from urllib import unquote, quote
 
 import time
@@ -111,11 +112,11 @@ class BaseConnectionPool(object):
         try:
             heartbeat, body_length = get_body_length(head)
         except DubboResponseException as e:
-            # 如果是服务端的响应发生了异常
-            # 1. 保存异常
-            # 2. 唤醒该连接上正在等待的请求线程
-            # 3. 读操作返回
-            self.results[host] = e
+            body_length = unpack('!i', head[12:])[0]
+            body = conn.read(body_length)
+            res = Response(body)
+            error = res.read_next()
+            self.results[host] = DubboResponseException('\n{}\n{}'.format(e.message, error))
             conn.notify()
             return
         body = conn.read(body_length)
