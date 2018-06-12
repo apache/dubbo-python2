@@ -426,7 +426,7 @@ class Connection(object):
 
     def read(self, length):
         self.last_active = time.time()
-        return bytearray(self.__sock.recv(length))
+        return bytearray(self.__sock.recv(length, socket.MSG_WAITALL))
 
     def close(self):
         self.__sock.shutdown(socket.SHUT_RDWR)
