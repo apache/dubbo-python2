@@ -105,7 +105,7 @@ class BaseConnectionPool(object):
         # 数据的头部大小为16个字节
         head = conn.read(16)
         if not head:  # 连接已关闭
-            logger.warn('{} closed by remote server'.format(host))
+            logger.debug('{} closed by remote server'.format(host))
             self._delete_connection(conn)
             return
 
@@ -168,7 +168,7 @@ class BaseConnectionPool(object):
                     if self.client_heartbeats[host] >= 3:
                         self._delete_connection(conn)
                         conn.close()  # 客户端主动关闭连接
-                        logger.warn('{} closed by client'.format(host))
+                        logger.debug('{} closed by client'.format(host))
                         continue
                     self.client_heartbeats[host] += 1
                     req = CLI_HEARTBEAT_REQ_HEAD + get_heartbeat_id() + CLI_HEARTBEAT_TAIL
@@ -326,12 +326,12 @@ class ZkRegister(object):
         path = event.path
         interface = path.split('/')[2]
 
-        # 非常的古怪因为children的watch好像只会生效一次所以需要反复的重新设置watch
         providers = self.zk.get_children(path, watch=self._watch_children)
         logger.debug('{} providers: {}'.format(interface, providers))
         if len(providers) == 0:
-            logger.warn('no providers for interface {}'.format(interface))
-            raise RegisterException('no providers for interface {}'.format(interface))
+            logger.debug('no providers for interface {}'.format(interface))
+            del self.hosts[interface]
+            return
         providers = map(parse_url, providers)
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
