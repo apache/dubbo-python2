@@ -24,3 +24,10 @@ class RegisterException(Exception):
     与注册中心相关的异常
     """
     pass
+
+
+class DubboRequestTimeoutException(Exception):
+    """
+    dubbo请求超时异常
+    """
+    pass

@@ -15,7 +15,7 @@ class DubboClient(object):
         self.__zk_register = zk_register
         self.__host = host
 
-    def call(self, method, args=()):
+    def call(self, method, args=(), timeout=None):
         if self.__zk_register:  # 优先从zk中获取provider的host
             host = self.__zk_register.get_provider_host(self.__interface)
         else:
@@ -30,7 +30,7 @@ class DubboClient(object):
             'arguments': args
         }
         # logger.debug(request_param)
-        result = connection_pool.get(host, request_param)
+        result = connection_pool.get(host, request_param, timeout)
         return result
 
 

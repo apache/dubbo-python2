@@ -17,7 +17,7 @@ from kazoo.client import KazooClient
 from codec.decoder import Response, get_body_length
 from codec.encoder import encode
 from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
-from common.exceptions import DubboException, RegisterException, DubboResponseException
+from common.exceptions import DubboException, RegisterException, DubboResponseException, DubboRequestTimeoutException
 from common.util import get_ip, get_pid, get_heartbeat_id, is_linux
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
@@ -46,14 +46,20 @@ class BaseConnectionPool(object):
         scanning_thread.setDaemon(True)
         scanning_thread.start()
 
-    def get(self, host, request_param):
+    def get(self, host, request_param, timeout=None):
         conn = self._get_connection(host)
         request = encode(request_param)
 
-        with conn:
-            conn.write(request)
-            conn.wait()
-            result = self.results.pop(host)
+        conn.lock()
+        conn.clear()
+        conn.write(request)
+        conn.wait(timeout)  # 等待数据读取完毕或超时
+        if host not in self.results:
+            conn.unlock()
+            raise DubboRequestTimeoutException(
+                'Socket(host=\'{}\'): Read timed out. (read timeout={})'.format(host, timeout))
+        result = self.results.pop(host)
+        conn.unlock()
 
         if isinstance(result, Exception):
             raise result
@@ -421,14 +427,28 @@ class Connection(object):
         return self.__sock.fileno()
 
     def write(self, data):
+        """
+        向远程主机写数据
+        :param data:
+        :return:
+        """
         self.last_active = time.time()
         self.__sock.sendall(data)
 
     def read(self, length):
+        """
+        读取远程主机的数据
+        :param length:
+        :return:
+        """
         self.last_active = time.time()
         return bytearray(self.__sock.recv(length, socket.MSG_WAITALL))
 
     def close(self):
+        """
+        关闭连接
+        :return:
+        """
         self.__sock.shutdown(socket.SHUT_RDWR)
         self.__sock.close()
 
@@ -436,17 +456,30 @@ class Connection(object):
         return self.__host
 
     def lock(self):
+        """
+        对此连接加锁
+        :return:
+        """
         return self.__lock.acquire()
 
     def unlock(self):
+        """
+        对此连接解锁
+        :return:
+        """
         self.__lock.release()
 
-    def wait(self):
+    def clear(self):
+        """
+        在进行wait和notify之前先要进行初始化操作
+        :return:
+        """
+        self.__event.clear()
+
+    def wait(self, timeout=None):
         # 如果notify更早的发生，将导致is_set为True，此时不再需要wait
         if not self.__event.is_set():
-            self.__event.wait()
-        # 为下一次的操作做初始化
-        self.__event.clear()
+            self.__event.wait(timeout)
 
     def notify(self):
         self.__event.set()
