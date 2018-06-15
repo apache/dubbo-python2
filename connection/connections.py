@@ -263,6 +263,10 @@ class ZkRegister(object):
     """
 
     def __init__(self, hosts, application_name='search_platform'):
+        """
+        :param hosts: Zookeeper的地址
+        :param application_name: 当前客户端的名称
+        """
         zk = KazooClient(hosts=hosts)
         zk.start()
 

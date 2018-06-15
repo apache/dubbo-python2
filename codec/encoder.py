@@ -31,8 +31,6 @@ def _encode_request_body(body):
     version = body['version']
     method = body['method']
     arguments = body['arguments']
-    if not isinstance(arguments, (list, tuple)):
-        arguments = [arguments]
 
     parameter_types = ''
     # 判断并得出参数的类型
