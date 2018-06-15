@@ -7,7 +7,7 @@ import logging
 
 from common.exceptions import DubboException
 from common.loggers import init_log
-from connection.connections import ZkRegister
+from connection.register import ZkRegister
 from dubbo import DubboClient
 
 logger = logging.getLogger('dubbo.py')
@@ -21,7 +21,7 @@ class TestDubbo(unittest.TestCase):
     def setUp(self):
         init_log()  # 初始化日志配置，调用端需要自己配置日志属性
 
-        zk = ZkRegister('127.0.0.1:2181')
+        zk = ZkRegister('172.21.4.98:2181')
         self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
         # dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
 

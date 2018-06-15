@@ -3,7 +3,7 @@ import json
 import threading
 
 from common.loggers import init_log
-from connection.connections import ZkRegister
+from connection.register import ZkRegister
 from dubbo import DubboClient
 
 
