@@ -11,7 +11,7 @@ from codec.decoder import Response, get_body_length
 from codec.encoder import encode
 from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
 from common.exceptions import DubboResponseException, DubboRequestTimeoutException
-from common.util import get_heartbeat_id, is_linux
+from common.util import get_heartbeat_id
 
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
 DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
@@ -240,7 +240,7 @@ class SelectConnectionPool(BaseConnectionPool):
         del self._connection_pool[conn.remote_host()]
 
 
-if is_linux():
+if hasattr(select, 'epoll'):
     connection_pool = EpollConnectionPool()
 else:
     connection_pool = SelectConnectionPool()
