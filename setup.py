@@ -2,7 +2,7 @@
 from setuptools import setup
 
 setup(
-    name='dubbo.py',
+    name='python-dubbo',
     version='0.0.1',
     url='https://github.com/RitterHou/dubbo.py',
     author='hourui',
