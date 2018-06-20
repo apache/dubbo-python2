@@ -37,10 +37,10 @@ class MyFormatter(logging.Formatter):
 
 def init_log():
     """
-    初始化dubbo.py的日志配置
+    初始化dubbo的日志配置
     :return:
     """
-    logger = logging.getLogger('dubbo.py')
+    logger = logging.getLogger('dubbo')
     console_handler = logging.StreamHandler(sys.stdout)
     formatter = MyFormatter(
         '%(asctime)s %(levelname)s \033[35m%(process)-5d\033[0m --- [%(threadName)15s] \033[33m%(lineno)-4d\033[0m \033[36m%(filename)s\033[0m: %(message)s')

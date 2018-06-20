@@ -11,7 +11,7 @@ from kazoo.client import KazooClient
 
 from connection.connections import connection_pool
 
-logger = logging.getLogger('dubbo.py')
+logger = logging.getLogger('dubbo')
 
 
 class DubboClient(object):

@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name='python-dubbo',
     version='0.0.3-beta1',
-    url='https://github.com/RitterHou/dubbo.py',
+    url='https://github.com/RitterHou/python-dubbo',
     author='hourui',
     author_email='hourui@qianmi.com',
     description='Python Dubbo Client.',

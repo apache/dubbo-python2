@@ -8,7 +8,7 @@ from dubbo.common.loggers import init_log
 from dubbo.common.exceptions import DubboException
 from dubbo.client import DubboClient, ZkRegister
 
-logger = logging.getLogger('dubbo.py')
+logger = logging.getLogger('dubbo')
 
 
 def pretty_print(value):
@@ -72,7 +72,7 @@ class TestDubbo(unittest.TestCase):
         pretty_print(dubbo.call('echo22'))
         pretty_print(dubbo.call('echo23'))
 
-        log = logging.getLogger('dubbo.py')
+        log = logging.getLogger('dubbo')
         log.debug('1111')
         log.info('22222')
 

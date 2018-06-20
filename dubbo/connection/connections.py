@@ -12,7 +12,7 @@ from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, C
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
 from dubbo.common.util import get_heartbeat_id
 
-logger = logging.getLogger('dubbo.py')
+logger = logging.getLogger('dubbo')
 
 
 class BaseConnectionPool(object):
