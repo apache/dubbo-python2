@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
-
 from struct import unpack
 
-from common.constants import response_status_message
-from common.exceptions import HessianTypeError, DubboException, DubboResponseException
+from dubbo.common.exceptions import HessianTypeError, DubboException, DubboResponseException
+from dubbo.common.constants import response_status_message
 
 functions = {}
 

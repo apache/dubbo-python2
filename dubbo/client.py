@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 import logging
-from random import randint
-
 import time
+from random import randint
 from urllib import quote
 
-from kazoo.client import KazooClient
-
+from common.constants import DUBBO_ZK_PROVIDERS, DUBBO_ZK_CONFIGURATORS, DUBBO_ZK_CONSUMERS
 from common.exceptions import RegisterException
 from common.util import parse_url, get_pid, get_ip
-from connection.connections import connection_pool, DUBBO_ZK_PROVIDERS, DUBBO_ZK_CONFIGURATORS, DUBBO_ZK_CONSUMERS
+from kazoo.client import KazooClient
+
+from connection.connections import connection_pool
 
 logger = logging.getLogger('dubbo.py')
 

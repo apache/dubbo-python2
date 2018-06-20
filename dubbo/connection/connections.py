@@ -1,21 +1,16 @@
 # -*- coding: utf-8 -*-
-import socket
-import threading
-from struct import unpack
-import time
-
 import logging
 import select
+import socket
+import threading
+import time
+from struct import unpack
 
-from codec.decoder import Response, get_body_length
-from codec.encoder import encode
-from common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
-from common.exceptions import DubboResponseException, DubboRequestTimeoutException
-from common.util import get_heartbeat_id
-
-DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
-DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
-DUBBO_ZK_CONFIGURATORS = '/dubbo/{}/configurators'
+from dubbo.codec.encoder import encode
+from dubbo.codec.decoder import Response, get_body_length
+from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
+from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
+from dubbo.common.util import get_heartbeat_id
 
 logger = logging.getLogger('dubbo.py')
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from common.util import num_2_byte_list
+from util import num_2_byte_list
 
 # 服务端的响应码
 response_status_message = {
@@ -52,3 +52,7 @@ CLI_HEARTBEAT_REQ_HEAD = num_2_byte_list(0xdabbe2) + [0]
 CLI_HEARTBEAT_RES_HEAD = num_2_byte_list(0xdabb2214)
 # 心跳尾部
 CLI_HEARTBEAT_TAIL = [0, 0, 0, 1] + num_2_byte_list(0x4e)
+
+DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
+DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
+DUBBO_ZK_CONFIGURATORS = '/dubbo/{}/configurators'

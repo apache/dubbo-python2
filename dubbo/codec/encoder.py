@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import struct
 
-from common.constants import DEFAULT_REQUEST_META, INT_DIRECT_MAX, INT_DIRECT_MIN, BC_INT_ZERO, INT_BYTE_MAX, \
+from dubbo.common.constants import DEFAULT_REQUEST_META, INT_DIRECT_MAX, INT_DIRECT_MIN, BC_INT_ZERO, INT_BYTE_MAX, \
     INT_BYTE_MIN, BC_INT_BYTE_ZERO, INT_SHORT_MIN, INT_SHORT_MAX, BC_INT_SHORT_ZERO, BC_DOUBLE_ZERO, BC_DOUBLE_ONE, \
     BC_DOUBLE_BYTE, BC_DOUBLE_MILL, STRING_DIRECT_MAX, BC_STRING_DIRECT, STRING_SHORT_MAX, BC_STRING_SHORT, \
     BC_DOUBLE_SHORT
-from common.exceptions import HessianTypeError
-from common.util import double_to_long_bits, num_2_byte_list
+from dubbo.common.exceptions import HessianTypeError
+from dubbo.common.util import double_to_long_bits, num_2_byte_list
 
 
 def encode(request):

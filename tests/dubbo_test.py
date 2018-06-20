@@ -1,13 +1,12 @@
 # -*- coding: utf-8 -*-
 import json
+import logging
 import threading
 import unittest
 
-import logging
-
-from common.exceptions import DubboException
-from common.loggers import init_log
-from dubbo import DubboClient, ZkRegister
+from dubbo.common.loggers import init_log
+from dubbo.common.exceptions import DubboException
+from dubbo.client import DubboClient, ZkRegister
 
 logger = logging.getLogger('dubbo.py')
 
