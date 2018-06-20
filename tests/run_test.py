@@ -15,7 +15,7 @@ class TestDubbo(unittest.TestCase):
         # dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
 
     def test_run(self):
-        result = self.dubbo.call('echo21')
+        result = self.dubbo.call('echo23')
         # result = dubbo.call('echo23')
         pretty_print(result)
 

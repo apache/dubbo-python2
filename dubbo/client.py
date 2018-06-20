@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+import threading
 import time
 from random import randint
 from urllib import quote
@@ -89,6 +90,7 @@ class ZkRegister(object):
         self.hosts = {}
         self.weights = {}
         self.application_name = application_name
+        self.lock = threading.Lock()
 
     def get_provider_host(self, interface):
         """
@@ -96,27 +98,30 @@ class ZkRegister(object):
         :param interface:
         :return:
         """
-        if not self.hosts.get(interface):
-            path = DUBBO_ZK_PROVIDERS.format(interface)
-            if self.zk.exists(path):
-                providers = self.zk.get_children(path, watch=self._watch_children)
-                if len(providers) == 0:
-                    raise RegisterException('no providers for interface {}'.format(interface))
-                providers = map(parse_url, providers)
-                self._register_consumer(providers)
-                self.hosts[interface] = map(lambda provider: provider['host'], providers)
+        if interface not in self.hosts:
+            self.lock.acquire()
+            if interface not in self.hosts:
+                path = DUBBO_ZK_PROVIDERS.format(interface)
+                if self.zk.exists(path):
+                    providers = self.zk.get_children(path, watch=self._watch_children)
+                    if len(providers) == 0:
+                        raise RegisterException('no providers for interface {}'.format(interface))
+                    providers = map(parse_url, providers)
+                    self._register_consumer(providers)
+                    self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
-                # 试图从配置中取出权重相关的信息
-                configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
-                                                     watch=self._watch_configurators)
-                if configurators:
-                    configurators = map(parse_url, configurators)
-                    conf = {}
-                    for configurator in configurators:
-                        conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
-                    self.weights[interface] = conf
-            else:
-                raise RegisterException('can\'t providers for interface {0}'.format(interface))
+                    # 试图从配置中取出权重相关的信息
+                    configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
+                                                         watch=self._watch_configurators)
+                    if configurators:
+                        configurators = map(parse_url, configurators)
+                        conf = {}
+                        for configurator in configurators:
+                            conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
+                        self.weights[interface] = conf
+                else:
+                    raise RegisterException('can\'t providers for interface {0}'.format(interface))
+            self.lock.release()
         return self._routing_with_wight(interface)
 
     def _routing_with_wight(self, interface):

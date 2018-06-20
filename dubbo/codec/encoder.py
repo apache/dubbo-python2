@@ -4,7 +4,7 @@ import struct
 from dubbo.common.constants import DEFAULT_REQUEST_META, INT_DIRECT_MAX, INT_DIRECT_MIN, BC_INT_ZERO, INT_BYTE_MAX, \
     INT_BYTE_MIN, BC_INT_BYTE_ZERO, INT_SHORT_MIN, INT_SHORT_MAX, BC_INT_SHORT_ZERO, BC_DOUBLE_ZERO, BC_DOUBLE_ONE, \
     BC_DOUBLE_BYTE, BC_DOUBLE_MILL, STRING_DIRECT_MAX, BC_STRING_DIRECT, STRING_SHORT_MAX, BC_STRING_SHORT, \
-    BC_DOUBLE_SHORT
+    BC_DOUBLE_SHORT, MIN_INT_32, MAX_INT_32
 from dubbo.common.exceptions import HessianTypeError
 from dubbo.common.util import double_to_long_bits, num_2_byte_list
 
@@ -38,7 +38,7 @@ def _encode_request_body(body):
         if isinstance(argument, bool):  # bool类型的判断必须放在int类型判断的前面
             parameter_types += 'Z'
         elif isinstance(argument, int):
-            if -2147483648 <= argument <= 2147483647:
+            if MIN_INT_32 <= argument <= MAX_INT_32:
                 parameter_types += 'I'
             else:
                 parameter_types += 'J'
@@ -91,7 +91,7 @@ def _encode_single_value(value):
             result.append(ord('F'))
         return result
     elif isinstance(value, int):
-        if value > 2147483647 or value < -2147483648:
+        if value > MAX_INT_32 or value < MIN_INT_32:
             result.append(ord('L'))
             result.extend(list(bytearray(struct.pack('>q', value))))
             return result
@@ -132,7 +132,7 @@ def _encode_single_value(value):
                 return result
 
         mills = int(value * 1000)
-        if 0.001 * mills == value and -2147483648 <= mills <= 2147483647:
+        if 0.001 * mills == value and MIN_INT_32 <= mills <= MAX_INT_32:
             result.append(BC_DOUBLE_MILL)
             result.append(mills >> 24)
             result.append(mills >> 16)
