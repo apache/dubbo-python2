@@ -3,8 +3,7 @@ import json
 import threading
 
 from common.loggers import init_log
-from connection.register import ZkRegister
-from dubbo import DubboClient
+from dubbo import DubboClient, ZkRegister
 
 
 def pretty_print(value):

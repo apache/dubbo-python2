@@ -7,8 +7,7 @@ import logging
 
 from common.exceptions import DubboException
 from common.loggers import init_log
-from connection.register import ZkRegister
-from dubbo import DubboClient
+from dubbo import DubboClient, ZkRegister
 
 logger = logging.getLogger('dubbo.py')
 
@@ -116,7 +115,7 @@ class TestDubbo(unittest.TestCase):
 
     # @unittest.skip('skip performance test')
     def test_performance(self):
-        for i in range(10000):
+        for i in range(10):
             self.dubbo.call('echo18')
 
 

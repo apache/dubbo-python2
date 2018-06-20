@@ -3,6 +3,7 @@ import os
 import socket
 import struct
 from sys import platform
+from urlparse import urlparse, unquote, parse_qsl
 
 ip = None
 heartbeat_id = 0
@@ -79,6 +80,25 @@ def is_linux():
         return True
     else:
         return False
+
+
+def parse_url(url_str):
+    """
+    把url字符串解析为适合于操作的对象
+    :param url_str:
+    :return:
+    """
+    url = urlparse(unquote(url_str))
+    fields = dict(parse_qsl(url.query))
+    result = {
+        'scheme': url.scheme,
+        'host': url.netloc,
+        'hostname': url.hostname,
+        'port': url.port,
+        'path': url.path,
+        'fields': fields
+    }
+    return result
 
 
 if __name__ == '__main__':
