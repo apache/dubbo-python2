@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='python-dubbo',
-    version='0.0.1',
+    version='0.0.3-beta1',
     url='https://github.com/RitterHou/dubbo.py',
     author='hourui',
     author_email='hourui@qianmi.com',
     description='Python Dubbo Client.',
     license='Apache License 2.0',
-    packages=['dubbo'],
+    packages=find_packages(),
     classifiers=[
         'Environment :: Console',
         'Intended Audience :: Developers',
