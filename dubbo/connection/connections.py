@@ -6,7 +6,7 @@ import threading
 import time
 from struct import unpack
 
-from dubbo.codec.encoder import encode
+from dubbo.codec.encoder import Request
 from dubbo.codec.decoder import Response, get_body_length
 from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
@@ -36,7 +36,7 @@ class BaseConnectionPool(object):
 
     def get(self, host, request_param, timeout=None):
         conn = self._get_connection(host)
-        request = encode(request_param)
+        request = Request(request_param).encode()
 
         conn.lock()
         conn.clear()
