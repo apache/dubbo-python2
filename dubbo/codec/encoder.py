@@ -216,10 +216,14 @@ class Request(object):
             result.append(bits >> 8)
             result.append(bits)
             return result
+        # 如果是unicode则转义为str类型后再进行操作
+        elif isinstance(value, unicode):
+            return self._encode_single_value(value.encode('utf-8'))
         # 字符串类型
         elif isinstance(value, str):
-            # 根据hessian协议这里的长度必须是字符串长度而不是字节长度，所以需要Unicode类型
-            length = len(value.decode('utf-8'))
+            # 根据hessian协议这里的长度必须是字符(char)长度而不是字节(byte)长度，所以需要Unicode类型
+            value = value.decode('utf-8')
+            length = len(value)
             if length <= STRING_DIRECT_MAX:
                 result.append(BC_STRING_DIRECT + length)
             elif length <= STRING_SHORT_MAX:
@@ -229,7 +233,20 @@ class Request(object):
                 result.append(ord('S'))
                 result.append(length >> 8)
                 result.append(length)
-            result.extend(list(bytearray(value)))  # 加上变量数组
+
+            # 对字符串进行编码，编码格式utf-8
+            # 参见方法：com.alibaba.com.caucho.hessian.io.Hessian2Output#printString
+            for v in value:
+                ch = ord(v)
+                if ch < 0x80:
+                    result.append(ch & 0xff)
+                elif ch < 0x800:
+                    result.append((0xc0 + ((ch >> 6) & 0x1f)) & 0xff)
+                    result.append((0x80 + (ch & 0x3f)) & 0xff)
+                else:
+                    result.append((0xe0 + ((ch >> 12) & 0xf)) & 0xff)
+                    result.append((0x80 + ((ch >> 6) & 0x3f)) & 0xff)
+                    result.append((0x80 + (ch & 0x3f)) & 0xff)
             return result
         # 对象类型
         elif isinstance(value, Object):

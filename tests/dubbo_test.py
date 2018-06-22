@@ -148,7 +148,7 @@ class TestDubbo(unittest.TestCase):
         employee['name'] = '我勒个去居然不能用emoji啊'
 
         lock = Object('me.hourui.echo.bean.retail.Lock')
-        lock['lockReason'] = '加锁的原因是什么呢？'
+        lock['lockReason'] = '加锁的原因是什么呢？🤔'
         lock['employee'] = employee
         lock['locked'] = True
 

@@ -161,19 +161,20 @@ class Response(object):
         :param length:
         :return:
         """
-        value = []
-        while length > 0:
-            c = self.read_byte()
-            value.append(c)
-            if c < 0x80:
-                pass
-            elif (c & 0xe0) == 0xc0:
-                value.extend(self.read_bytes(1))
-            elif (c & 0xf0) == 0xe0:
-                value.extend(self.read_bytes(2))
-            elif (c & 0xf8) == 0xf0:
-                value.extend(self.read_bytes(3))
-            length -= 1
+        value = ''
+        for i in range(length):
+            ch = self.read_byte()
+            if ch < 0x80:
+                value += unichr(ch)
+            elif (ch & 0xe0) == 0xc0:
+                ch1 = self.read_byte()
+                value += unichr(((ch & 0x1f) << 6) + (ch1 & 0x3f))
+            elif (ch & 0xf0) == 0xe0:
+                ch1 = self.read_byte()
+                ch2 = self.read_byte()
+                value += unichr(((ch & 0x0f) << 12) + ((ch1 & 0x3f) << 6) + (ch2 & 0x3f))
+            else:
+                raise ValueError('Can\'t parse utf-8 char {}'.format(ch))
         return value
 
     @ranges((0x00, 0x1f), (0x30, 0x33), 0x52, ord('S'))
@@ -183,10 +184,10 @@ class Response(object):
         :return:
         """
         value = self.read_byte()
-        buf = []
+        string = ''
         while value == 0x52:
             length = unpack('!h', self.read_bytes(2))[0]
-            buf.extend(self._read_utf(length))
+            string += self._read_utf(length)
             value = self.read_byte()
 
         if value == ord('S'):
@@ -196,8 +197,8 @@ class Response(object):
         else:
             length = (value - 0x30) << 8 | self.read_byte()
 
-        buf.extend(self._read_utf(length))
-        return str(bytearray(buf))
+        string += self._read_utf(length)
+        return string.encode('utf-8')  # 将unicode转化为str类型
 
     @ranges((0x60, 0x6f), ord('O'))
     def read_object(self):
