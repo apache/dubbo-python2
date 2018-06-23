@@ -6,8 +6,21 @@ _Python Dubbo Client._
 
     pip install python-dubbo
 
-## Example
+## Usage
 
+```python
+from dubbo.client import DubboClient, ZkRegister
+
+# 支持从Zk中获取服务的provider，支持根据provider的权重选择主机
+zk = ZkRegister('127.0.0.1:2181')
+dubbo_cli = DubboClient('com.qianmi.pc.api.GoodsQueryProvider', zk_register=zk)
+
+# 支持不使用Zk，直接连接指定的远程主机
+dubbo_cli = DubboClient('com.qianmi.pc.api.GoodsQueryProvider', host='127.0.0.1:20880')
+
+admin_id = 'A000000'
+result = dubbo_cli.call('listByIdString', admin_id)
+```
 
 ## Reference
 
