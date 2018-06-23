@@ -91,7 +91,7 @@ class Request(object):
                     parameter_types += 'J'
             elif isinstance(argument, float):
                 parameter_types += 'D'
-            elif isinstance(argument, str):
+            elif isinstance(argument, (str, unicode)):
                 parameter_types += 'Ljava/lang/String;'
             elif isinstance(argument, Object):
                 path = argument.get_path()
@@ -157,7 +157,7 @@ class Request(object):
         elif isinstance(value, int):
             if value > MAX_INT_32 or value < MIN_INT_32:
                 result.append(ord('L'))
-                result.extend(list(bytearray(struct.pack('>q', value))))
+                result.extend(list(bytearray(struct.pack('!q', value))))
                 return result
 
             if INT_DIRECT_MIN <= value <= INT_DIRECT_MAX:
@@ -216,13 +216,11 @@ class Request(object):
             result.append(bits >> 8)
             result.append(bits)
             return result
-        # 如果是unicode则转义为str类型后再进行操作
-        elif isinstance(value, unicode):
-            return self._encode_single_value(value.encode('utf-8'))
         # 字符串类型
-        elif isinstance(value, str):
-            # 根据hessian协议这里的长度必须是字符(char)长度而不是字节(byte)长度，所以需要Unicode类型
-            value = value.decode('utf-8')
+        elif isinstance(value, (str, unicode)):
+            # 在进行网络传输操作时一律使用unicode进行操作
+            if isinstance(value, str):
+                value = value.decode('utf-8')
             length = len(value)
             if length <= STRING_DIRECT_MAX:
                 result.append(BC_STRING_DIRECT + length)

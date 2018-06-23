@@ -161,7 +161,7 @@ class Response(object):
         :param length:
         :return:
         """
-        value = ''
+        value = u''
         for i in range(length):
             ch = self.read_byte()
             if ch < 0x80:
@@ -175,7 +175,7 @@ class Response(object):
                 value += unichr(((ch & 0x0f) << 12) + ((ch1 & 0x3f) << 6) + (ch2 & 0x3f))
             else:
                 raise ValueError('Can\'t parse utf-8 char {}'.format(ch))
-        return value
+        return value.encode('utf-8')  # 将unicode转化为str类型
 
     @ranges((0x00, 0x1f), (0x30, 0x33), 0x52, ord('S'))
     def read_string(self):
@@ -185,7 +185,7 @@ class Response(object):
         """
         value = self.read_byte()
         string = ''
-        while value == 0x52:
+        while value == 'R':
             length = unpack('!h', self.read_bytes(2))[0]
             string += self._read_utf(length)
             value = self.read_byte()
@@ -198,7 +198,7 @@ class Response(object):
             length = (value - 0x30) << 8 | self.read_byte()
 
         string += self._read_utf(length)
-        return string.encode('utf-8')  # 将unicode转化为str类型
+        return string
 
     @ranges((0x60, 0x6f), ord('O'))
     def read_object(self):
