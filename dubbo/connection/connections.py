@@ -39,19 +39,19 @@ class BaseConnectionPool(object):
         request = Request(request_param).encode()
 
         conn.lock()
-        conn.clear()
-        conn.write(request)
-        conn.wait(timeout)  # 等待数据读取完毕或超时
-        if host not in self.results:
+        try:
+            conn.clear()
+            conn.write(request)
+            conn.wait(timeout)  # 等待数据读取完毕或超时
+            if host not in self.results:
+                raise DubboRequestTimeoutException(
+                    'Socket(host=\'{}\'): Read timed out. (read timeout={})'.format(host, timeout))
+            result = self.results.pop(host)
+        finally:
             conn.unlock()
-            raise DubboRequestTimeoutException(
-                'Socket(host=\'{}\'): Read timed out. (read timeout={})'.format(host, timeout))
-        result = self.results.pop(host)
-        conn.unlock()
 
         if isinstance(result, Exception):
             raise result
-
         return result
 
     def _get_connection(self, host):
@@ -221,7 +221,7 @@ class SelectConnectionPool(BaseConnectionPool):
                 conns = self._connection_pool.values()
                 readable, writeable, exceptional = select.select(conns, [], [], self.select_timeout)
             except select.error as e:
-                logger.error(e)
+                logger.exception(e)
                 break
             for conn in readable:
                 self._read(conn)

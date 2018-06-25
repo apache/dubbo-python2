@@ -11,12 +11,12 @@ class TestDubbo(unittest.TestCase):
     def setUp(self):
         init_log()  # 初始化日志配置，调用端需要自己配置日志属性
 
-        # zk = ZkRegister('172.21.4.98:2181')
-        # self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
-        self.dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
+        zk = ZkRegister('172.21.4.98:2181')
+        self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
+        # self.dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
 
     def test_run(self):
-        print self.dubbo.call('test2', u'🐶🐶🐶111🐶🐶🐶你好啊啊🐶🐶🐶🐶の🐶🐶🐶🐶')
+        print self.dubbo.call('echo1', u'🐶🐶🐶111🐶🐶🐶你好啊啊🐶🐶🐶🐶の🐶🐶🐶🐶')
 
         # print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])
         #
