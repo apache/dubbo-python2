@@ -4,7 +4,6 @@ import select
 import socket
 import threading
 import time
-import traceback
 from struct import unpack
 
 from dubbo.codec.encoder import Request
@@ -146,7 +145,7 @@ class BaseConnectionPool(object):
                 else:
                     raise DubboResponseException("Unknown result flag, expect '0' '1' '2', get " + flag)
             except Exception as e:
-                traceback.print_exc()
+                logger.exception(e)
                 self.results[host] = e
             finally:
                 conn.notify()  # 唤醒请求线程
