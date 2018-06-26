@@ -56,6 +56,17 @@ class Object(object):
 
 
 class Request(object):
+    """
+    A class for dumping dubbo request body.
+    All types can be dumped:
+    * boolean
+    * int
+    * long
+    * double
+    * string
+    * object
+    """
+
     def __init__(self, request):
         self.__body = request
         self.__classes = []
@@ -286,9 +297,4 @@ def get_request_body_length(body):
 
 
 if __name__ == '__main__':
-    o = Object('java.lang.Object')
-    o['name'] = '张三'
-    o['age'] = 20
-    print o.keys()
-    print '111' in o
-    print o
+    pass

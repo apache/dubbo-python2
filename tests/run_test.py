@@ -11,18 +11,22 @@ class TestDubbo(unittest.TestCase):
     def setUp(self):
         init_log()  # 初始化日志配置，调用端需要自己配置日志属性
 
-        zk = ZkRegister('172.21.4.98:2181')
-        self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
-        # self.dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
+        zk = ZkRegister('172.21.4.71:2181')
+        self.spu_query_provider = DubboClient('com.qianmi.pc.item.api.spu.SpuQueryProvider', zk_register=zk)
+        # self.dubbo = DubboClient('com.qianmi.pc.item.api.spu', host='172.21.36.82:20880')
 
     def test_run(self):
-        print self.dubbo.call('echo1', u'🐶🐶🐶111🐶🐶🐶你好啊啊🐶🐶🐶🐶の🐶🐶🐶🐶')
+        channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum')
+        channel['name'] = 'D2C'
 
-        # print dubbo.call('echo', ['张老师', '三', 19, 2000.0, True])
-        #
-        # for i in range(10):
-        #     thread = threading.Thread(target=run, args=(dubbo,))
-        #     thread.start()
+        spu_query_request = Object('com.qianmi.pc.item.api.spu.request.SpuQueryRequest')
+        spu_query_request['chainMasterId'] = 'A000000'
+        spu_query_request['channel'] = channel
+        spu_query_request['pageSize'] = 2000
+
+        result = self.spu_query_provider.call('query', spu_query_request)
+        pretty_print(result)
+        print len(result['dataList'])
 
 
 def pretty_print(value):

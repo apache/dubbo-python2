@@ -44,14 +44,16 @@ class Response(object):
     * byte
     * boolean
     * int
+    * long
     * double
     * string
     * object
+    * class
+    * generic type
     * list
     * map
+    * date
     * null
-
-    * type
     """
 
     def __init__(self, data):

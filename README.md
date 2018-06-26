@@ -8,6 +8,8 @@ _Python Dubbo Client._
 
 ## Usage
 
+#### 基础使用
+
 ```python
 from dubbo.client import DubboClient, ZkRegister
 
@@ -20,6 +22,44 @@ dubbo_cli = DubboClient('com.qianmi.pc.api.GoodsQueryProvider', host='127.0.0.1:
 
 admin_id = 'A000000'
 result = dubbo_cli.call('listByIdString', admin_id)
+```
+
+#### 如何定义参数
+
+python-dubbo支持以下Java类型的参数：
+* bool              对应Python中的bool类型
+* int, long         对应Python中的int类型
+* float, double     对应Python中的float类型
+* java.lang.String  对应Python中的str类型
+* java.lang.Object  具体使用方式如下所示：
+```python
+# 使用Java的对象类型
+from dubbo.client import DubboClient, ZkRegister
+from dubbo.codec.encoder import Object
+
+# 创建channel对象
+channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum')
+channel['name'] = 'D2C'
+
+# 创建spu_query_request对象
+spu_query_request = Object('com.qianmi.pc.item.api.spu.request.SpuQueryRequest')
+spu_query_request['chainMasterId'] = 'A000000'
+spu_query_request['channel'] = channel
+spu_query_request['pageSize'] = 2000
+
+# 创建consumer并执行查询操作
+zk = ZkRegister('172.21.4.71:2181')
+spu_query_provider = DubboClient('com.qianmi.pc.item.api.spu.SpuQueryProvider', zk_register=zk)
+result = spu_query_provider.call('query', spu_query_request)
+```
+
+#### 如何使用枚举(enum)类型作为参数
+
+```python
+# 定义一个枚举类型的对象
+channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum')
+# 定义参数`name`的值为枚举参数，之后使用该对象作为参数即可
+channel['name'] = 'D2C'
 ```
 
 ## Reference

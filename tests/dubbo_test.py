@@ -20,9 +20,9 @@ class TestDubbo(unittest.TestCase):
     def setUp(self):
         init_log()  # 初始化日志配置，调用端需要自己配置日志属性
 
-        # zk = ZkRegister('172.21.4.98:2181')
-        # self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
-        self.dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
+        zk = ZkRegister('172.21.4.98:2181')
+        self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
+        # self.dubbo = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
 
     def tearDown(self):
         # Do something to clear the test environment here.
@@ -118,6 +118,40 @@ class TestDubbo(unittest.TestCase):
         for i in range(10):
             self.dubbo.call('echo18')
 
+    def test_auto_rule(self):
+        dubbo_cli = DubboClient('com.qianmi.common.autorule.api.WarehouseProvider', host='172.21.36.82:20880')
+        delivery_man_query = Object('com.qianmi.common.autorule.api.request.warehouse.DeliveryManQueryRequest')
+        delivery_man_query['userId'] = 'A1035712'
+        delivery_man_query['warehouseId'] = '15373'
+        delivery_man_query['deliveryManId'] = 'E132862'
+        result = dubbo_cli.call('getWarehouseByDeliveryMan', delivery_man_query)
+        pretty_print(result)
+
+        delivery_area_query = Object('com.qianmi.common.autorule.api.request.warehouse.DeliveryAreaQueryRequest')
+        delivery_area_query['userId'] = 'A1035527'
+        delivery_area_query['warehouseId'] = '15346'
+        delivery_area = Object('com.qianmi.common.autorule.api.bean.DeliveryArea')
+        delivery_area['provinceName'] = '上海'
+        delivery_area_query['deliveryArea'] = delivery_area
+
+        result = dubbo_cli.call('getWarehouseByDeliveryArea', delivery_area_query)
+        pretty_print(result)
+
+        warehouse_type_request = Object('com.qianmi.common.autorule.api.request.warehouse.GetWarehouseRuleTypeRequest')
+        warehouse_type_request['userId'] = 'A1035527'
+        warehouse_type_request['warehouseId'] = '15346'
+        result = dubbo_cli.call('getWarehouseRuleType', warehouse_type_request)
+        pretty_print(result)
+
+        zk_cli = ZkRegister('172.21.4.71:2181')
+        dubbo_cli = DubboClient('com.qianmi.common.autorule.api.OrderRuleProvider', zk_register=zk_cli)
+        order_query = Object('com.qianmi.common.autorule.api.request.order.OrderListByCustomerServiceIdRequest')
+        order_query['userId'] = 'A1035527'
+        order_query['customerServiceId'] = 'E132802'
+        result = dubbo_cli.call('listOrdersByCustomerServiceId', order_query)
+        pretty_print(result)
+
+    @unittest.skip('object')
     def test_object(self):
         new_user = Object('me.hourui.echo.bean.NewUser')
         user1 = Object('me.hourui.echo.bean.User1')

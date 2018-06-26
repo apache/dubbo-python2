@@ -5,11 +5,11 @@ import time
 from random import randint
 from urllib import quote
 
+from kazoo.client import KazooClient
+
 from dubbo.common.constants import DUBBO_ZK_PROVIDERS, DUBBO_ZK_CONFIGURATORS, DUBBO_ZK_CONSUMERS
 from dubbo.common.exceptions import RegisterException
 from dubbo.common.util import parse_url, get_pid, get_ip
-from kazoo.client import KazooClient
-
 from connection.connections import connection_pool
 
 logger = logging.getLogger('dubbo')
