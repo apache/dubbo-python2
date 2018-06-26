@@ -22,14 +22,17 @@ class Object(object):
     创建一个Java对象
     """
 
-    def __init__(self, path):
+    def __init__(self, path, values=None):
         """
-        :param path: Java对象的路径，例如：java.lang.Object
+        :param path:   Java对象的路径，例如：java.lang.Object
+        :param values: 可以在创建对象时就进行赋值
         """
-        if not isinstance(path, str):
+        if not isinstance(path, (str, unicode)):
             raise ValueError('Object path {} should be string type.'.format(path))
         self.__path = path
-        self.__values = {}
+        if not isinstance(values, dict):
+            values = {}
+        self.__values = values
 
     def __getitem__(self, key):
         return self.__values[key]

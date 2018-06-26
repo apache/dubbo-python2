@@ -34,7 +34,7 @@ python-dubbo支持以下Java类型的参数，表格右边一列代表了在Pyto
 | 整型 | int, long | int |
 | 浮点类型 | float, double | float |
 | 字符串类型 | java.lang.String | str |
-| 列表类型 | _可迭代的对象_ | [] |
+| 列表类型 | Collection & Array | [] |
 | 自定义的对象类型 | java.lang.Object | ↓ _具体使用方法如下所示_ ↓ |
 
 ##### 使用Java的对象类型
@@ -43,8 +43,9 @@ from dubbo.client import DubboClient, ZkRegister
 from dubbo.codec.encoder import Object
 
 # 创建channel对象
-channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum')
-channel['name'] = 'D2C'
+channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum', values={
+    'name': 'D2C'
+})
 
 # 创建spu_query_request对象
 spu_query_request = Object('com.qianmi.pc.item.api.spu.request.SpuQueryRequest')
@@ -72,6 +73,7 @@ channel['name'] = 'D2C'
 * Python字节相关的转化操作：<https://docs.python.org/2/library/struct.html>
 * Hessian2的编码规则：<http://hessian.caucho.com/doc/hessian-serialization.html>
 * 实现Hessian2编码时的参考：[参考1](https://github.com/WKPlus/pyhessian2/blob/3.1.5/pyhessian2/encoder.py)，[参考2](https://github.com/zhouyougit/PyDubbo/blob/master/dubbo/hessian2.py)
+* 对于部分不清楚且通过查阅文档仍无法了解的编码方式，先使用Java的dubbo客户端正常调用接口，之后使用[Wireshark](https://en.wikipedia.org/wiki/Wireshark)抓包获取请求和响应的数据报文，仔细的分析报文来推测编码方式
 * Dubbo相关的编码规则：[参考1](http://fe.58qf.com/2017/11/07/node-dubbo/)，[参考2](http://cxis.me/2017/03/19/Dubbo%E4%B8%AD%E7%BC%96%E7%A0%81%E5%92%8C%E8%A7%A3%E7%A0%81%E7%9A%84%E8%A7%A3%E6%9E%90/)
 * Dubbo的心跳机制：<http://www.cnblogs.com/java-zhao/p/8539046.html>
 * 部分实现参考了dubbo的Java源码中的实现
