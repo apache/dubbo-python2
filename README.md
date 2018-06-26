@@ -26,15 +26,15 @@ result = dubbo_cli.call('listByIdString', admin_id)
 
 #### 如何定义参数
 
-python-dubbo支持以下Java类型的参数，表格右边一列代表了在Pyton中与左边Java类型所对应的类型
+python-dubbo支持以下Java类型的参数，表格右边一列代表了在Pyton中与指定Java类型所对应的类型
 
-| Java | Python |
-| :--- | :--- |
-| boolean | bool |
-| int, long | int |
-| float, double | float |
-| java.lang.String | str |
-| java.lang.Object | ↓ _具体使用方法如下所示_ ↓ |
+| 类型 | Java | Python |
+| :--- | :--- | :--- |
+| 布尔类型 | boolean | bool |
+| 整型 | int, long | int |
+| 浮点类型 | float, double | float |
+| 字符串类型 | java.lang.String | str |
+| 自定义的对象类型 | java.lang.Object | ↓ _具体使用方法如下所示_ ↓ |
 
 ##### 使用Java的对象类型
 ```python
