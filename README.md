@@ -34,9 +34,9 @@ python-dubbo支持以下Java类型的参数，表格右边一列代表了在Pyto
 | 整型 | int, long | int |
 | 浮点类型 | float, double | float |
 | 字符串类型 | java.lang.String | str |
-| 自定义的对象类型 | java.lang.Object | ↓ _具体使用方法如下所示_ ↓ |
+| 自定义的对象类型 | java.lang.Object | ↓ _具体使用方法如下所示_ ↓ |
 
-##### 使用Java的对象类型
+##### 使用Java的对象类型
 ```python
 from dubbo.client import DubboClient, ZkRegister
 from dubbo.codec.encoder import Object
