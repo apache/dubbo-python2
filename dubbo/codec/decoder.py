@@ -260,30 +260,34 @@ class Response(object):
         result = []
         self.objects.append(result)
         value = self.read_byte()
+        # 固定长度的有类型短小列表
         if 0x70 <= value <= 0x77:
             _type = self.read_type()  # type对于Python来说没有用处
             length = value - 0x70
             for i in range(length):
                 result.append(self.read_next())
+        # 固定长度的无类型短小列表
         elif 0x78 <= value <= 0x7f:
             length = value - 0x78
             for i in range(length):
                 result.append(self.read_next())
-        elif value == 0x55:
-            _type = self.read_type()
-            # 数组的内容为空
+        # 固定长度的有类型列表
         elif value == 0x56:
             _type = self.read_type()
             length = self.read_int()
             for i in range(length):
                 result.append(self.read_next())
-        elif value == 0x57:
-            pass
-            # 数组的内容为空
+        # 固定长度的无类型列表
         elif value == 0x58:
             length = self.read_int()
             for i in range(length):
                 result.append(self.read_next())
+        # 可变长度的有类型列表
+        elif value == 0x55:
+            _type = self.read_type()
+        # 可变长度的无类型列表
+        elif value == 0x57:
+            pass
         return result
 
     @ranges((0xd8, 0xff), (0x38, 0x3f), 0x59, ord('L'))

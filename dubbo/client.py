@@ -28,6 +28,9 @@ class DubboClient(object):
         :param zk_register: zookeeper注册中心管理端，参见类：ZkRegister
         :param host: 远程主机地址，用于绕过zookeeper进行直连，例如：172.21.4.98:20882
         """
+        if not zk_register and not host:
+            raise RegisterException('zk_register和host至少需要填入一个')
+
         self.__interface = interface
         self.__version = version
         self.__dubbo_version = dubbo_version

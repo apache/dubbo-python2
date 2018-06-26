@@ -76,4 +76,4 @@ channel['name'] = 'D2C'
 * 部分实现参考了dubbo的Java源码中的实现
 * 对于所有的字符串，在网络传输前进行编码，编码一律使用unicode来完成，如果一个字符串是str则先将其decode为unicode之后再进行操作；
 * 对于所有的字符串，在网络上获取到的数据之后进行解码，解码得到的字符串是unicode，之后将其encode为str再交给客户程序；
-* 支持传输utf-8编码和Emoji🧐
+* 支持传输utf-8编码和Emoji😋
