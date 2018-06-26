@@ -70,6 +70,7 @@ class Request(object):
     def __init__(self, request):
         self.__body = request
         self.__classes = []
+        self.types = []  # 泛型
 
     def encode(self):
         """
@@ -80,8 +81,7 @@ class Request(object):
         request_head = DEFAULT_REQUEST_META + get_request_body_length(request_body)
         return bytearray(request_head + request_body)
 
-    @staticmethod
-    def _get_parameter_types(arguments):
+    def _get_parameter_types(self, arguments):
         """
         针对所有的参数计算得到参数类型字符串
         :param arguments:
@@ -90,24 +90,37 @@ class Request(object):
         parameter_types = ''
         # 判断并得出参数的类型
         for argument in arguments:
-            if isinstance(argument, bool):  # bool类型的判断必须放在int类型判断的前面
-                parameter_types += 'Z'
-            elif isinstance(argument, int):
-                if MIN_INT_32 <= argument <= MAX_INT_32:
-                    parameter_types += 'I'
-                else:
-                    parameter_types += 'J'
-            elif isinstance(argument, float):
-                parameter_types += 'D'
-            elif isinstance(argument, (str, unicode)):
-                parameter_types += 'Ljava/lang/String;'
-            elif isinstance(argument, Object):
-                path = argument.get_path()
-                path = 'L' + path.replace('.', '/') + ';'
-                parameter_types += path
-            else:
-                raise HessianTypeError('Unknown argument type: {0}'.format(argument))
+            parameter_types += self._get_class_name(argument)
         return parameter_types
+
+    def _get_class_name(self, _class):
+        """
+        根据一个字段的类型得到其在Java中对应类的全限定名
+        转换规则：https://stackoverflow.com/a/3442100/4614538
+        :param _class:
+        :return:
+        """
+        if isinstance(_class, bool):  # bool类型的判断必须放在int类型判断的前面
+            return 'Z'
+        elif isinstance(_class, int):
+            if MIN_INT_32 <= _class <= MAX_INT_32:
+                return 'I'
+            else:
+                return 'J'
+        elif isinstance(_class, float):
+            return 'D'
+        elif isinstance(_class, (str, unicode)):
+            return 'L' + 'java/lang/String' + ';'
+        elif isinstance(_class, Object):
+            path = _class.get_path()
+            path = 'L' + path.replace('.', '/') + ';'
+            return path
+        elif isinstance(_class, list):
+            if len(_class) == 0:
+                raise HessianTypeError('Method parameter {} is a list but length is zero'.format(_class))
+            return '[' + self._get_class_name(_class[0])
+        else:
+            raise HessianTypeError('Unknown argument type: {0}'.format(_class))
 
     def _encode_request_body(self):
         """
@@ -279,8 +292,50 @@ class Request(object):
             for field_name in field_names:
                 result.extend(self._encode_single_value(value[field_name]))
             return result
+        # 列表(list)类型，不可以使用tuple替代
+        elif isinstance(value, list):
+            length = len(value)
+            if length == 0:
+                # 没有值则无法判断类型，一律返回null
+                return self._encode_single_value(None)
+            if isinstance(value[0], bool):
+                _type = '[boolean'
+            elif isinstance(value[0], int):
+                _type = '[int'
+            elif isinstance(value[0], float):
+                _type = '[double'
+            elif isinstance(value[0], str):
+                _type = '[string'
+            elif isinstance(value[0], Object):
+                _type = '[object'
+            else:
+                raise HessianTypeError('Unknown list type: {}'.format(value[0]))
+            if length < 0x7:
+                result.append(0x70 + length)
+                if _type not in self.types:
+                    self.types.append(_type)
+                    result.extend(self._encode_single_value(_type))
+                else:
+                    result.extend(self._encode_single_value(self.types.index(_type)))
+            else:
+                result.append(0x56)
+                if _type not in self.types:
+                    self.types.append(_type)
+                    result.extend(self._encode_single_value(_type))
+                else:
+                    result.extend(self._encode_single_value(self.types.index(_type)))
+                result.extend(self._encode_single_value(length))
+            for v in value:
+                if type(value[0]) != type(v):
+                    raise HessianTypeError('All elements in list must be the same type, first type'
+                                           ' is {0} but current type is {1}'.format(type(value[0]), type(v)))
+                result.extend(self._encode_single_value(v))
+            return result
+        elif value is None:
+            result.append(ord('N'))
+            return result
         else:
-            raise HessianTypeError('Unknown argument type: {0}'.format(value))
+            raise HessianTypeError('Unknown argument type: {}'.format(value))
 
 
 def get_request_body_length(body):

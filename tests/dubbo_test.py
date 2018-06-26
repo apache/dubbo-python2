@@ -207,6 +207,29 @@ class TestDubbo(unittest.TestCase):
         # result = dubbo.call('echo23')
         pretty_print(result)
 
+    def test_array(self):
+        location1 = Object('me.hourui.echo.bean.Location')
+        location1['province'] = '江苏省'
+        location1['city'] = '南京市'
+        location1['street'] = '软件大道'
+        location2 = Object('me.hourui.echo.bean.Location')
+        location2['province'] = '浙江省'
+        location2['city'] = '杭州市'
+        location2['street'] = '余杭区'
+
+        user1 = Object('me.hourui.echo.bean.User1')
+        user1['name'] = '张三'
+        user2 = Object('me.hourui.echo.bean.User1')
+        user2['name'] = '李四'
+
+        array = Object('me.hourui.echo.bean.Object4Array')
+        array['locations'] = [location1, location2]
+        array['users'] = [user1, user2]
+        array['strings'] = ['这是', '一个', '不可', '重复', '重复', '重复', '重复', '的', '列表']
+
+        dubbo_cli = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
+        dubbo_cli.call('test4', [['你好', '我好'], [2, 3, 3, 3], array])
+
 
 if __name__ == '__main__':
     # test = TestDubbo()
