@@ -26,15 +26,18 @@ result = dubbo_cli.call('listByIdString', admin_id)
 
 #### 如何定义参数
 
-python-dubbo支持以下Java类型的参数：
-* bool              对应Python中的bool类型
-* int, long         对应Python中的int类型
-* float, double     对应Python中的float类型
-* java.lang.String  对应Python中的str类型
-* java.lang.Object  具体使用方式如下所示：
+python-dubbo支持以下Java类型的参数，表格右边一列代表了在Pyton中与左边Java类型所对应的类型
 
+| Java | Python |
+| :--- | :--- |
+| boolean | bool |
+| int, long | int |
+| float, double | float |
+| java.lang.String | str |
+| java.lang.Object | ↓ _具体使用方法如下所示_ ↓ |
+
+##### 使用Java的对象类型
 ```python
-# 使用Java的对象类型
 from dubbo.client import DubboClient, ZkRegister
 from dubbo.codec.encoder import Object
 
@@ -59,7 +62,7 @@ result = spu_query_provider.call('query', spu_query_request)
 ```python
 # 定义一个枚举类型的对象
 channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum')
-# 定义参数`name`的值为枚举参数，之后使用该对象作为参数即可
+# 定义参数name并令其值为对应的枚举参数的值，之后使用该定义好的对象作为枚举类型变量即可
 channel['name'] = 'D2C'
 ```
 
