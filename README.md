@@ -32,6 +32,7 @@ python-dubbo支持以下Java类型的参数：
 * float, double     对应Python中的float类型
 * java.lang.String  对应Python中的str类型
 * java.lang.Object  具体使用方式如下所示：
+
 ```python
 # 使用Java的对象类型
 from dubbo.client import DubboClient, ZkRegister
