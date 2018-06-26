@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 
-class DubboException(Exception):
+class DubboException(RuntimeError):
     pass
 
 
@@ -12,21 +12,21 @@ class DubboResponseException(DubboException):
     pass
 
 
-class HessianTypeError(Exception):
+class HessianTypeError(DubboException):
     """
     Hessian解码的时候发生了解析类型错误
     """
     pass
 
 
-class RegisterException(Exception):
+class RegisterException(DubboException):
     """
     与注册中心相关的异常
     """
     pass
 
 
-class DubboRequestTimeoutException(Exception):
+class DubboRequestTimeoutException(DubboException):
     """
     dubbo请求超时异常
     """
