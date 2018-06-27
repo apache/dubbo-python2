@@ -81,4 +81,4 @@ channel['name'] = 'D2C'
 * 对于所有的字符串，在网络上获取到的数据之后进行解码，解码得到的字符串是unicode，之后将其encode为str再交给客户程序；
 * 支持传输utf-8编码和Emoji😋
 * 使用epoll模型来维护所有的链接，如果使用多线程来维护连接将产生过多的thread_context_switch，影响性能
-* 类似于HTTP请求和响应，dubbo的请求和响应也是同步的并且可以看成是一个事务；不过dubbo使用了msg_id来为请求排序，这使得我们不再需要像HTTP请求那样在单个链接上进行同步的请求和响应，在单个连接上有多个请求时可以一定程度的降低请求总时间，这种编码的理念类似于[HTTP2](https://zh.wikipedia.org/wiki/HTTP/2)中的stream ID
+* 类似于HTTP请求和响应，dubbo的请求和响应也是同步的并且可以看成是一个事务；不过dubbo使用了msg_id来为请求排序，这使得我们不再需要像HTTP请求那样在单个链接上进行同步的请求和响应，因此在单个连接上有多个请求时可以一定程度的降低请求总时间，这种对请求进行编码的理念类似于[HTTP2](https://zh.wikipedia.org/wiki/HTTP/2)中的stream ID
