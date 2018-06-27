@@ -25,6 +25,7 @@ class BaseConnectionPool(object):
         self.client_heartbeats = {}
         # 创建连接的锁
         self.__conn_lock = threading.Lock()
+        self.__event = threading.Event()
 
         reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
@@ -36,19 +37,19 @@ class BaseConnectionPool(object):
 
     def get(self, host, request_param, timeout=None):
         conn = self._get_connection(host)
-        request = Request(request_param).encode()
+        request = Request(request_param)
+        request_data = request.encode()
+        request_invoke_id = request.invoke_id
 
-        conn.lock()
-        try:
-            conn.clear()
-            conn.write(request)
-            conn.wait(timeout)  # 等待数据读取完毕或超时
-            if host not in self.results:
+        conn.write(request_data)
+        since_request = time.time()  # 从发出请求开始计时
+        while request_invoke_id not in self.results:
+            if timeout and time.time() - since_request > timeout:
                 raise DubboRequestTimeoutException(
-                    'Socket(host=\'{}\'): Read timed out. (read timeout={})'.format(host, timeout))
-            result = self.results.pop(host)
-        finally:
-            conn.unlock()
+                    "Socket(host='{}'): Read timed out. (read timeout={})".format(host, timeout))
+            self.__event.clear()
+            self.__event.wait(timeout=timeout)
+        result = self.results.pop(request_invoke_id)
 
         if isinstance(result, Exception):
             raise result
@@ -127,28 +128,30 @@ class BaseConnectionPool(object):
             self.client_heartbeats[host] -= 1
         # 普通的数据包
         else:
+            # 请求的调用id，目的是将请求和请求所对应的响应对应起来
+            invoke_id = unpack('!q', head[4:12])[0]
             try:
                 res = Response(body)
                 flag = res.read_int()
                 if flag == 2:  # 响应的值为NULL
-                    self.results[host] = None
+                    self.results[invoke_id] = None
                 elif flag == 1:  # 正常的响应值
                     result = res.read_next()
-                    self.results[host] = result
+                    self.results[invoke_id] = result
                 elif flag == 0:  # 异常的响应值
                     err = res.read_error()
                     error = '\n{cause}: {detailMessage}\n'.format(**err)
                     stack_trace = err['stackTrace']
                     for trace in stack_trace:
                         error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
-                    self.results[host] = DubboResponseException(error)
+                    self.results[invoke_id] = DubboResponseException(error)
                 else:
                     raise DubboResponseException("Unknown result flag, expect '0' '1' '2', get " + flag)
             except Exception as e:
                 logger.exception(e)
-                self.results[host] = e
+                self.results[invoke_id] = e
             finally:
-                conn.notify()  # 唤醒请求线程
+                self.__event.set()  # 唤醒请求线程
 
     def _send_heartbeat(self):
         """
@@ -293,41 +296,6 @@ class Connection(object):
 
     def remote_host(self):
         return self.__host
-
-    def lock(self):
-        """
-        对此连接加锁
-        :return:
-        """
-        return self.__lock.acquire()
-
-    def unlock(self):
-        """
-        对此连接解锁
-        :return:
-        """
-        self.__lock.release()
-
-    def clear(self):
-        """
-        在进行wait和notify之前先要进行初始化操作
-        :return:
-        """
-        self.__event.clear()
-
-    def wait(self, timeout=None):
-        # 如果notify更早的发生，将导致is_set为True，此时不再需要wait
-        if not self.__event.is_set():
-            self.__event.wait(timeout)
-
-    def notify(self):
-        self.__event.set()
-
-    def __enter__(self):
-        return self.lock()
-
-    def __exit__(self, *unused):
-        self.unlock()
 
     def __repr__(self):
         return self.__host

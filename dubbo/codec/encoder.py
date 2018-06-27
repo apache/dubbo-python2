@@ -14,7 +14,7 @@ import struct
 
 from dubbo.common.constants import *
 from dubbo.common.exceptions import HessianTypeError
-from dubbo.common.util import double_to_long_bits, num_2_byte_list
+from dubbo.common.util import double_to_long_bits, num_2_byte_list, get_invoke_id
 
 
 class Object(object):
@@ -74,6 +74,7 @@ class Request(object):
         self.__body = request
         self.__classes = []
         self.types = []  # 泛型
+        self.invoke_id = get_invoke_id()
 
     def encode(self):
         """
@@ -81,7 +82,8 @@ class Request(object):
         :return:
         """
         request_body = self._encode_request_body()
-        request_head = DEFAULT_REQUEST_META + get_request_body_length(request_body)
+        invoke_id = list(bytearray(struct.pack('!q', self.invoke_id)))
+        request_head = DEFAULT_REQUEST_META + invoke_id + get_request_body_length(request_body)
         return bytearray(request_head + request_body)
 
     def _get_parameter_types(self, arguments):

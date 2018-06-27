@@ -2,11 +2,16 @@
 import os
 import socket
 import struct
+import threading
 from sys import platform
 from urlparse import urlparse, unquote, parse_qsl
 
 ip = None
 heartbeat_id = 0
+invoke_id = 0
+
+# 获取调用ID时必须要加锁
+invoke_id_lock = threading.Lock()
 
 
 def num_2_byte_list(num):
@@ -101,5 +106,25 @@ def parse_url(url_str):
     return result
 
 
+def get_invoke_id():
+    """
+    获取dubbo的调用id
+    :return:
+    """
+    global invoke_id
+    invoke_id_lock.acquire()
+    result = invoke_id
+    invoke_id += 1
+    invoke_id_lock.release()
+    return result
+
+
 if __name__ == '__main__':
-    print platform
+    def test():
+        while 1:
+            print get_invoke_id()
+
+
+    for i in range(10):
+        thread = threading.Thread(target=test)
+        thread.start()

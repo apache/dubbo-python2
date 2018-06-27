@@ -48,8 +48,8 @@ MAX_INT_32 = 2147483647
 # 32位整型的最小值
 MIN_INT_32 = -2147483648
 
-# MAGIC_NUM(2) + FLAG(1) + STATUS(1) + INVOKE_ID(8)
-DEFAULT_REQUEST_META = num_2_byte_list(0xdabbc2000000000000000000)
+# MAGIC_NUM(2) + FLAG(1) + STATUS(1)
+DEFAULT_REQUEST_META = num_2_byte_list(0xdabbc200)
 
 # 客户端对服务端发送的心跳的请求的头部
 CLI_HEARTBEAT_REQ_HEAD = num_2_byte_list(0xdabbe2) + [0]
