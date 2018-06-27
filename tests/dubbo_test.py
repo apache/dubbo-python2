@@ -230,6 +230,49 @@ class TestDubbo(unittest.TestCase):
         dubbo_cli = DubboClient('me.hourui.echo.provider.Echo', host='127.0.0.1:20880')
         dubbo_cli.call('test4', [['你好', '我好'], [2, 3, 3, 3], array])
 
+    def test_pc(self):
+        zk = ZkRegister('172.21.4.71:2181')
+        spu_query_provider = DubboClient('com.qianmi.pc.item.api.spu.SpuQueryProvider', zk_register=zk)
+
+        channel = Object('com.qianmi.pc.base.api.constants.ChannelEnum', values={
+            'name': 'D2C'
+        })
+
+        spu_query_request = Object('com.qianmi.pc.item.api.spu.request.SpuQueryRequest')
+        spu_query_request['chainMasterId'] = 'A000000'
+        spu_query_request['channel'] = channel
+        spu_query_request['pageSize'] = 20
+        result = spu_query_provider.call('query', spu_query_request)
+        # pretty_print(result)
+        total = result['totalCount']
+        print total
+        print len(result['dataList'])
+
+        data_list = result['dataList']
+        for data in data_list:
+            spu_id = data['spuId']
+            spu_desc_request = Object('com.qianmi.pc.item.api.spu.request.SpuDescriptionGetRequest')
+            spu_desc_request['spuId'] = spu_id
+            print spu_id
+            spu_desc_request['chainMasterId'] = 'A000000'
+            pretty_print(spu_query_provider.call('getDescription', spu_desc_request))
+
+        for data in data_list:
+            spu_request = Object('com.qianmi.pc.item.api.spu.request.SpuGetRequest')
+            spu_request['chainMasterId'] = 'A000000'
+            spu_request['spuId'] = data['spuId']
+            spu_request['channelEnum'] = channel
+
+            pretty_print(spu_query_provider.call('getById', spu_request))
+
+        spu_ids = map(lambda spu: spu['spuId'], data_list)
+        spu_ids_request = Object('com.qianmi.pc.item.api.spu.request.SpuListByIdsRequest')
+        spu_ids_request['chainMasterId'] = 'A000000'
+        spu_ids_request['channelEnum'] = channel
+        spu_ids_request['spuIds'] = spu_ids
+        batch_spu_request = spu_query_provider.call('listByIds', spu_ids_request)
+        pretty_print(batch_spu_request)
+
 
 if __name__ == '__main__':
     # test = TestDubbo()

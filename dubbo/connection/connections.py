@@ -43,10 +43,13 @@ class BaseConnectionPool(object):
 
         conn.write(request_data)
         since_request = time.time()  # 从发出请求开始计时
+
+        # 这里的实现很不严谨，我试图使用别的线程的唤醒事件来避免某个未设置超时的线程永远阻塞
+        default_timeout = timeout or 60
         while request_invoke_id not in self.results:
-            if timeout and time.time() - since_request > timeout:
+            if time.time() - since_request > default_timeout:
                 raise DubboRequestTimeoutException(
-                    "Socket(host='{}'): Read timed out. (read timeout={})".format(host, timeout))
+                    "Socket(host='{}'): Read timed out. (read timeout={})".format(host, default_timeout))
             self.__event.clear()
             self.__event.wait(timeout=timeout)
         result = self.results.pop(request_invoke_id)
