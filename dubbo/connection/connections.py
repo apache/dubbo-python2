@@ -4,13 +4,13 @@ import select
 import socket
 import threading
 import time
-from struct import unpack
+from struct import unpack, pack
 
 from dubbo.codec.encoder import Request
 from dubbo.codec.decoder import Response, get_body_length
 from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
-from dubbo.common.util import get_heartbeat_id
+from dubbo.common.util import get_invoke_id
 
 logger = logging.getLogger('dubbo')
 
@@ -172,7 +172,8 @@ class BaseConnectionPool(object):
                         logger.debug('{} closed by client'.format(host))
                         continue
                     self.client_heartbeats[host] += 1
-                    req = CLI_HEARTBEAT_REQ_HEAD + get_heartbeat_id() + CLI_HEARTBEAT_TAIL
+                    invoke_id = list(bytearray(pack('!q', get_invoke_id())))
+                    req = CLI_HEARTBEAT_REQ_HEAD + invoke_id + CLI_HEARTBEAT_TAIL
                     conn.write(bytearray(req))
             ending = time.time()
             time_delta = ending - starting

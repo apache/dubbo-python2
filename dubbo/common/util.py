@@ -3,7 +3,7 @@ import os
 import socket
 import struct
 import threading
-from sys import platform
+from sys import platform, maxsize
 from urlparse import urlparse, unquote, parse_qsl
 
 ip = None
@@ -115,6 +115,8 @@ def get_invoke_id():
     invoke_id_lock.acquire()
     result = invoke_id
     invoke_id += 1
+    if invoke_id == maxsize:
+        invoke_id = 0  # 大于long的最大值则重置为0
     invoke_id_lock.release()
     return result
 
