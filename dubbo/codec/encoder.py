@@ -161,7 +161,7 @@ class Request(object):
         body.append(ord('Z'))
 
         # 因为在上面的逻辑中没有对byte大小进行检测，所以在这里进行统一的处理
-        for i in range(len(body)):
+        for i in xrange(len(body)):
             body[i] = body[i] & 0xff
         return body
 

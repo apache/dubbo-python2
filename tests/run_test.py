@@ -16,10 +16,10 @@ class TestDubbo(unittest.TestCase):
         self.dubbo = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
 
     def test_run(self):
-        for i in range(10):
-            # thread = threading.Thread(target=run, args=(self.dubbo,))
-            # thread.start()
-            self.dubbo.call('echo18')
+        for i in xrange(10):
+            thread = threading.Thread(target=run, args=(self.dubbo,))
+            thread.start()
+            # self.dubbo.call('echo18')
 
 
 def pretty_print(value):
@@ -27,7 +27,7 @@ def pretty_print(value):
 
 
 def run(_dubbo):
-    for j in range(10000000):
+    for j in xrange(1000):
         _dubbo.call('echo18', timeout=1)
 
 

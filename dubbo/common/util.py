@@ -122,11 +122,4 @@ def get_invoke_id():
 
 
 if __name__ == '__main__':
-    def test():
-        while 1:
-            print get_invoke_id()
-
-
-    for i in range(10):
-        thread = threading.Thread(target=test)
-        thread.start()
+    pass

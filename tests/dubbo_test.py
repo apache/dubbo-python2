@@ -109,13 +109,13 @@ class TestDubbo(unittest.TestCase):
 
     # @unittest.skip('skip performance test')
     def test_multi_threading(self):
-        for i in range(10):
+        for i in xrange(10):
             thread = threading.Thread(target=self._run_num)
             thread.start()
 
     # @unittest.skip('skip performance test')
     def test_performance(self):
-        for i in range(10):
+        for i in xrange(10):
             self.dubbo.call('echo18')
 
     def test_auto_rule(self):

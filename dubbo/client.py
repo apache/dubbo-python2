@@ -152,7 +152,7 @@ class ZkRegister(object):
             hosts_weight.append(int(weights.get(host, '100')))
 
         hit = randint(0, sum(hosts_weight) - 1)
-        for i in range(len(hosts)):
+        for i in xrange(len(hosts)):
             if hit <= sum(hosts_weight[:i + 1]):
                 return hosts[i]
 
