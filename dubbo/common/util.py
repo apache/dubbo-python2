@@ -71,15 +71,6 @@ def get_pid():
     return os.getpid()
 
 
-def get_heartbeat_id():
-    global heartbeat_id
-    heartbeat_id += 1
-    heartbeat_id_byte = num_2_byte_list(heartbeat_id)
-    while len(heartbeat_id_byte) < 8:
-        heartbeat_id_byte = [0] + heartbeat_id_byte
-    return heartbeat_id_byte
-
-
 def is_linux():
     if platform == "linux" or platform == "linux2":
         return True

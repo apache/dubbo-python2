@@ -8,7 +8,8 @@ from struct import unpack, pack
 
 from dubbo.codec.encoder import Request
 from dubbo.codec.decoder import Response, get_body_length
-from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD
+from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD, \
+    TIMEOUT_CHECK_INTERVAL, TIMEOUT_IDLE, TIMEOUT_MAX_TIMES
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
 from dubbo.common.util import get_invoke_id
 
@@ -167,8 +168,8 @@ class BaseConnectionPool(object):
             starting = time.time()
             for host in self._connection_pool.keys():
                 conn = self._connection_pool[host]
-                if time.time() - conn.last_active > 60:
-                    if self.client_heartbeats[host] >= 3:
+                if time.time() - conn.last_active > TIMEOUT_IDLE:
+                    if self.client_heartbeats[host] >= TIMEOUT_MAX_TIMES:
                         self._delete_connection(conn)
                         conn.close()  # 客户端主动关闭连接
                         logger.debug('{} closed by client'.format(host))
@@ -179,8 +180,8 @@ class BaseConnectionPool(object):
                     conn.write(bytearray(req))
             ending = time.time()
             time_delta = ending - starting
-            if time_delta < 10:
-                time.sleep(10 - time_delta)
+            if time_delta < TIMEOUT_CHECK_INTERVAL:
+                time.sleep(TIMEOUT_CHECK_INTERVAL - time_delta)
 
 
 class EpollConnectionPool(BaseConnectionPool):

@@ -349,11 +349,7 @@ def get_request_body_length(body):
     :param body:
     :return:
     """
-    request_body_length = num_2_byte_list(len(body))
-    # 用4个字节表示请求body的长度
-    while len(request_body_length) < 4:
-        request_body_length = [0] + request_body_length
-    return request_body_length
+    return list(bytearray(struct.pack('!i', len(body))))
 
 
 if __name__ == '__main__':

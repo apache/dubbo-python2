@@ -61,3 +61,10 @@ CLI_HEARTBEAT_TAIL = [0, 0, 0, 1] + num_2_byte_list(0x4e)
 DUBBO_ZK_PROVIDERS = '/dubbo/{}/providers'
 DUBBO_ZK_CONSUMERS = '/dubbo/{}/consumers'
 DUBBO_ZK_CONFIGURATORS = '/dubbo/{}/configurators'
+
+# 客户端检测与远程主机的连接是否超时的间隔
+TIMEOUT_CHECK_INTERVAL = 0.03  # 30ms
+# 连接最长允许的空闲时间
+TIMEOUT_IDLE = 60
+# 连接允许的最多的超时次数
+TIMEOUT_MAX_TIMES = 3
