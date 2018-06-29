@@ -68,10 +68,12 @@ class BaseConnectionPool(object):
             raise ValueError('invalid host {}'.format(host))
         if host not in self._connection_pool:
             self.__conn_lock.acquire()
-            if host not in self._connection_pool:
-                self.client_heartbeats[host] = 0
-                self._new_connection(host)
-            self.__conn_lock.release()
+            try:
+                if host not in self._connection_pool:
+                    self.client_heartbeats[host] = 0
+                    self._new_connection(host)
+            finally:
+                self.__conn_lock.release()
         return self._connection_pool[host]
 
     def _new_connection(self, host):
