@@ -46,7 +46,7 @@ class Object(object):
         del self.__values[key]
 
     def __repr__(self):
-        return '<{}>'.format(self.__path)
+        return '<java object {0} at {1}>'.format(self.__path, hex(id(self)))
 
     def __contains__(self, key):
         return key in self.__values
