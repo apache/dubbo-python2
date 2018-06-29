@@ -113,12 +113,13 @@ class BaseConnectionPool(object):
         try:
             heartbeat, body_length = get_body_length(head)
         except DubboResponseException as e:
+            # 这里是dubbo的内部异常，与下面的业务异常不一样
             body_length = unpack('!i', head[12:])[0]
             body = conn.read(body_length)
             res = Response(body)
             error = res.read_next()
             self.results[host] = DubboResponseException('\n{}\n{}'.format(e.message, error))
-            conn.notify()
+            self.__event.set()
             return
         body = conn.read(body_length)
 
