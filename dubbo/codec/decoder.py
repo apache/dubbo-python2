@@ -61,6 +61,8 @@ class Response(object):
         self.__index = 0
         self.types = []
         self.objects = []
+        # 对于一个类来说，有path的地方就应该有field_name
+        self.paths = []
         self.field_names = []
 
     def get_byte(self):
@@ -219,6 +221,14 @@ class Response(object):
         for field_name in field_names:
             field_value = self.read_next()
             result[field_name] = field_value
+
+        path = self.paths[ref]
+        if path in ('java.math.BigDecimal', 'java.math.BigInteger'):
+            # 从变量value中获取到真正的数值
+            result = float(result['value'])
+            if result == int(result):
+                result = int(result)
+
         return result
 
     @ranges(ord('C'))
@@ -229,25 +239,14 @@ class Response(object):
         """
         self.read_byte()
         path = self.read_string()
+        self.paths.append(path)
 
         field_length = self.read_int()
         field_names = []
         for i in xrange(field_length):
             field_names.append(self.read_string())
         self.field_names.append(field_names)
-        result = self.read_object()
-
-        if path in ('java.math.BigDecimal', 'java.math.BigInteger'):
-            # 从变量value中获取到真正的数值
-            result = float(result['value'])
-            if result == int(result):
-                result = int(result)
-            # 替换对象缓存列表中的对象为数值类型
-            # 如果读取的对象是一个数值对象类型，那么必然意味着其不存在更多的子对象，那么在read_object中就不会
-            # 继续读取新的对象，那么刚刚加入的数值对象必然是缓存中的最后一个元素，所以我们才可以使用下面的替换
-            self.objects[-1] = result
-
-        return result
+        return self.read_object()
 
     def read_type(self):
         """
@@ -400,6 +399,7 @@ class Response(object):
         """
         self.read_byte()
         error_type = self.read_string()
+        self.paths.append(error_type)
 
         field_length = self.read_int()
         field_names = []
