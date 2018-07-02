@@ -115,9 +115,9 @@ class ZkRegister(object):
                 path = DUBBO_ZK_PROVIDERS.format(interface)
                 if self.zk.exists(path):
                     providers = self.zk.get_children(path, watch=self._watch_children)
+                    providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
                     if len(providers) == 0:
                         raise RegisterException('no providers for interface {}'.format(interface))
-                    providers = map(parse_url, providers)
                     self._register_consumer(providers)
                     self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
@@ -169,11 +169,11 @@ class ZkRegister(object):
 
         providers = self.zk.get_children(path, watch=self._watch_children)
         logger.debug('{} providers: {}'.format(interface, providers))
+        providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
         if len(providers) == 0:
             logger.debug('no providers for interface {}'.format(interface))
             del self.hosts[interface]
             return
-        providers = map(parse_url, providers)
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
     def _watch_configurators(self, event):
