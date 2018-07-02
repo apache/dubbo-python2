@@ -228,14 +228,26 @@ class Response(object):
         :return:
         """
         self.read_byte()
-        path = self.read_string()  # 类型名称在Python中并没有使用到
+        path = self.read_string()
 
         field_length = self.read_int()
         field_names = []
         for i in xrange(field_length):
             field_names.append(self.read_string())
         self.field_names.append(field_names)
-        return self.read_object()
+        result = self.read_object()
+
+        if path in ('java.math.BigDecimal', 'java.math.BigInteger'):
+            # 从变量value中获取到真正的数值
+            result = float(result['value'])
+            if result == int(result):
+                result = int(result)
+            # 替换对象缓存列表中的对象为数值类型
+            # 如果读取的对象是一个数值对象类型，那么必然意味着其不存在更多的子对象，那么在read_object中就不会
+            # 继续读取新的对象，那么刚刚加入的数值对象必然是缓存中的最后一个元素，所以我们才可以使用下面的替换
+            self.objects[-1] = result
+
+        return result
 
     def read_type(self):
         """

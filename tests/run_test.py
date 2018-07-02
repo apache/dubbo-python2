@@ -19,11 +19,18 @@ class TestDubbo(unittest.TestCase):
         # for i in xrange(10):
         #     thread = threading.Thread(target=run, args=(self.dubbo,))
         #     thread.start()
-        goods_query_request = Object('com.qianmi.pc.es.api.request.EsGoodsQueryRequest', values={
-            'chainMasterId': 'A000000',
-            'fromSys': 1
+        # goods_query_request = Object('com.qianmi.pc.es.api.request.EsGoodsQueryRequest', values={
+        #     'chainMasterId': 'A859315',
+        #     'fromSys': 2,
+        #     'pageNum': 50
+        # })
+        # result = self.dubbo.call('query', goods_query_request)
+        # pretty_print(result)
+        goods_list_by_id_request = Object('com.qianmi.pc.es.api.request.EsGoodsListByIdStringRequest', values={
+            'chainMasterId': 'A859315',
+            'idString': 'g51426:g51424'
         })
-        result = self.dubbo.call('query', goods_query_request)
+        result = self.dubbo.call('listByIdString', goods_list_by_id_request)
         pretty_print(result)
 
 
