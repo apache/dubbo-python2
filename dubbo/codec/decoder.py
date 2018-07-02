@@ -224,8 +224,8 @@ class Response(object):
 
         path = self.paths[ref]
         if path == 'java.math.BigDecimal':
-            result = float(result['value'])
-            self.objects[-1] = result or 0
+            result = float(result['value']) or 0
+            self.objects[-1] = result
         elif path == 'java.math.BigInteger':
             result = int(result['value'])
             self.objects[-1] = result
