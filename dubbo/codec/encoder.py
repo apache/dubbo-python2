@@ -14,7 +14,7 @@ import struct
 
 from dubbo.common.constants import *
 from dubbo.common.exceptions import HessianTypeError
-from dubbo.common.util import double_to_long_bits, num_2_byte_list, get_invoke_id
+from dubbo.common.util import double_to_long_bits, get_invoke_id
 
 
 class Object(object):
@@ -165,180 +165,216 @@ class Request(object):
             body[i] = body[i] & 0xff
         return body
 
+    @staticmethod
+    def _encode_bool(value):
+        result = []
+        if value:
+            result.append(ord('T'))
+        else:
+            result.append(ord('F'))
+        return result
+
+    @staticmethod
+    def _encode_int(value):
+        result = []
+        # 超出int类型范围的值则转化为long类型
+        if value > MAX_INT_32 or value < MIN_INT_32:
+            result.append(ord('L'))
+            result.extend(list(bytearray(struct.pack('!q', value))))
+            return result
+
+        if INT_DIRECT_MIN <= value <= INT_DIRECT_MAX:
+            result.append(value + BC_INT_ZERO)
+        elif INT_BYTE_MIN <= value <= INT_BYTE_MAX:
+            result.append(BC_INT_BYTE_ZERO + (value >> 8))
+            result.append(value)
+        elif INT_SHORT_MIN <= value <= INT_SHORT_MAX:
+            result.append(BC_INT_SHORT_ZERO + (value >> 16))
+            result.append(value >> 8)
+            result.append(value)
+        else:
+            result.append(ord('I'))
+            result.append(value >> 24)
+            result.append(value >> 16)
+            result.append(value >> 8)
+            result.append(value)
+        return result
+
+    @staticmethod
+    def _encode_float(value):
+        result = []
+        int_value = int(value)
+        if int_value == value:
+            if int_value == 0:
+                result.append(BC_DOUBLE_ZERO)
+                return result
+            elif int_value == 1:
+                result.append(BC_DOUBLE_ONE)
+                return result
+            elif -0x80 <= int_value < 0x80:
+                result.append(BC_DOUBLE_BYTE)
+                result.append(int_value)
+                return result
+            elif -0x8000 <= int_value < 0x8000:
+                result.append(BC_DOUBLE_SHORT)
+                result.append(int_value >> 8)
+                result.append(int_value)
+                return result
+
+        mills = int(value * 1000)
+        if 0.001 * mills == value and MIN_INT_32 <= mills <= MAX_INT_32:
+            result.append(BC_DOUBLE_MILL)
+            result.append(mills >> 24)
+            result.append(mills >> 16)
+            result.append(mills >> 8)
+            result.append(mills)
+            return result
+
+        bits = double_to_long_bits(value)
+        result.append(ord('D'))
+        result.append(bits >> 56)
+        result.append(bits >> 48)
+        result.append(bits >> 40)
+        result.append(bits >> 32)
+        result.append(bits >> 24)
+        result.append(bits >> 16)
+        result.append(bits >> 8)
+        result.append(bits)
+        return result
+
+    @staticmethod
+    def _encode_utf(value):
+        """
+        对字符串进行编码，编码格式utf-8
+        参见方法：com.alibaba.com.caucho.hessian.io.Hessian2Output#printString
+        :param value:
+        :return:
+        """
+        result = []
+        for v in value:
+            ch = ord(v)
+            if ch < 0x80:
+                result.append(ch & 0xff)
+            elif ch < 0x800:
+                result.append((0xc0 + ((ch >> 6) & 0x1f)) & 0xff)
+                result.append((0x80 + (ch & 0x3f)) & 0xff)
+            else:
+                result.append((0xe0 + ((ch >> 12) & 0xf)) & 0xff)
+                result.append((0x80 + ((ch >> 6) & 0x3f)) & 0xff)
+                result.append((0x80 + (ch & 0x3f)) & 0xff)
+        return result
+
+    def _encode_str(self, value):
+        result = []
+        # 在进行网络传输操作时一律使用unicode进行操作
+        if isinstance(value, str):
+            value = value.decode('utf-8')
+        length = len(value)
+        if length <= STRING_DIRECT_MAX:
+            result.append(BC_STRING_DIRECT + length)
+        elif length <= STRING_SHORT_MAX:
+            result.append(BC_STRING_SHORT + (length >> 8))
+            result.append(length)
+        else:
+            result.append(ord('S'))
+            result.append(length >> 8)
+            result.append(length)
+
+        result.extend(self._encode_utf(value))
+        return result
+
+    def _encode_object(self, value):
+        result = []
+        path = value.get_path()
+        field_names = value.keys()
+
+        if path not in self.__classes:
+            result.append(ord('C'))
+            result.extend(self._encode_single_value(path))
+
+            result.extend(self._encode_single_value(len(field_names)))
+
+            for field_name in field_names:
+                result.extend(self._encode_single_value(field_name))
+            self.__classes.append(path)
+        class_id = self.__classes.index(path)
+        if class_id <= 0xf:
+            class_id += 0x60
+            class_id &= 0xff
+            result.append(class_id)
+        else:
+            result.append(ord('O'))
+            result.extend(self._encode_single_value(class_id))
+        for field_name in field_names:
+            result.extend(self._encode_single_value(value[field_name]))
+        return result
+
+    def _encode_list(self, value):
+        result = []
+        length = len(value)
+        if length == 0:
+            # 没有值则无法判断类型，一律返回null
+            return self._encode_single_value(None)
+        if isinstance(value[0], bool):
+            _type = '[boolean'
+        elif isinstance(value[0], int):
+            _type = '[int'
+        elif isinstance(value[0], float):
+            _type = '[double'
+        elif isinstance(value[0], str):
+            _type = '[string'
+        elif isinstance(value[0], Object):
+            _type = '[object'
+        else:
+            raise HessianTypeError('Unknown list type: {}'.format(value[0]))
+        if length < 0x7:
+            result.append(0x70 + length)
+            if _type not in self.types:
+                self.types.append(_type)
+                result.extend(self._encode_single_value(_type))
+            else:
+                result.extend(self._encode_single_value(self.types.index(_type)))
+        else:
+            result.append(0x56)
+            if _type not in self.types:
+                self.types.append(_type)
+                result.extend(self._encode_single_value(_type))
+            else:
+                result.extend(self._encode_single_value(self.types.index(_type)))
+            result.extend(self._encode_single_value(length))
+        for v in value:
+            if type(value[0]) != type(v):
+                raise HessianTypeError('All elements in list must be the same type, first type'
+                                       ' is {0} but current type is {1}'.format(type(value[0]), type(v)))
+            result.extend(self._encode_single_value(v))
+        return result
+
     def _encode_single_value(self, value):
         """
         根据hessian协议对单个变量进行编码
         :param value:
         :return:
         """
-        result = []
         # 布尔类型
         if isinstance(value, bool):
-            if value:
-                result.append(ord('T'))
-            else:
-                result.append(ord('F'))
-            return result
+            return self._encode_bool(value)
         # 整型（包括长整型）
         elif isinstance(value, int):
-            if value > MAX_INT_32 or value < MIN_INT_32:
-                result.append(ord('L'))
-                result.extend(list(bytearray(struct.pack('!q', value))))
-                return result
-
-            if INT_DIRECT_MIN <= value <= INT_DIRECT_MAX:
-                result.append(value + BC_INT_ZERO)
-            elif INT_BYTE_MIN <= value <= INT_BYTE_MAX:
-                result.append(BC_INT_BYTE_ZERO + (value >> 8))
-                result.append(value)
-            elif INT_SHORT_MIN <= value <= INT_SHORT_MAX:
-                result.append(BC_INT_SHORT_ZERO + (value >> 16))
-                result.append(value >> 8)
-                result.append(value)
-            else:
-                result.append(ord('I'))
-                result.append(value >> 24)
-                result.append(value >> 16)
-                result.append(value >> 8)
-                result.append(value)
-            return result
+            return self._encode_int(value)
         # 浮点类型
         elif isinstance(value, float):
-            int_value = int(value)
-            if int_value == value:
-                if int_value == 0:
-                    result.append(BC_DOUBLE_ZERO)
-                    return result
-                elif int_value == 1:
-                    result.append(BC_DOUBLE_ONE)
-                    return result
-                elif -0x80 <= int_value < 0x80:
-                    result.append(BC_DOUBLE_BYTE)
-                    result.append(int_value)
-                    return result
-                elif -0x8000 <= int_value < 0x8000:
-                    result.append(BC_DOUBLE_SHORT)
-                    result.append(int_value >> 8)
-                    result.append(int_value)
-                    return result
-
-            mills = int(value * 1000)
-            if 0.001 * mills == value and MIN_INT_32 <= mills <= MAX_INT_32:
-                result.append(BC_DOUBLE_MILL)
-                result.append(mills >> 24)
-                result.append(mills >> 16)
-                result.append(mills >> 8)
-                result.append(mills)
-                return result
-
-            bits = double_to_long_bits(value)
-            result.append(ord('D'))
-            result.append(bits >> 56)
-            result.append(bits >> 48)
-            result.append(bits >> 40)
-            result.append(bits >> 32)
-            result.append(bits >> 24)
-            result.append(bits >> 16)
-            result.append(bits >> 8)
-            result.append(bits)
-            return result
+            return self._encode_float(value)
         # 字符串类型
         elif isinstance(value, (str, unicode)):
-            # 在进行网络传输操作时一律使用unicode进行操作
-            if isinstance(value, str):
-                value = value.decode('utf-8')
-            length = len(value)
-            if length <= STRING_DIRECT_MAX:
-                result.append(BC_STRING_DIRECT + length)
-            elif length <= STRING_SHORT_MAX:
-                result.append(BC_STRING_SHORT + (length >> 8))
-                result.append(length)
-            else:
-                result.append(ord('S'))
-                result.append(length >> 8)
-                result.append(length)
-
-            # 对字符串进行编码，编码格式utf-8
-            # 参见方法：com.alibaba.com.caucho.hessian.io.Hessian2Output#printString
-            for v in value:
-                ch = ord(v)
-                if ch < 0x80:
-                    result.append(ch & 0xff)
-                elif ch < 0x800:
-                    result.append((0xc0 + ((ch >> 6) & 0x1f)) & 0xff)
-                    result.append((0x80 + (ch & 0x3f)) & 0xff)
-                else:
-                    result.append((0xe0 + ((ch >> 12) & 0xf)) & 0xff)
-                    result.append((0x80 + ((ch >> 6) & 0x3f)) & 0xff)
-                    result.append((0x80 + (ch & 0x3f)) & 0xff)
-            return result
+            return self._encode_str(value)
         # 对象类型
         elif isinstance(value, Object):
-            path = value.get_path()
-            field_names = value.keys()
-
-            if path not in self.__classes:
-                result.append(ord('C'))
-                result.extend(self._encode_single_value(path))
-
-                result.extend(self._encode_single_value(len(field_names)))
-
-                for field_name in field_names:
-                    result.extend(self._encode_single_value(field_name))
-                self.__classes.append(path)
-            class_id = self.__classes.index(path)
-            if class_id <= 0xf:
-                class_id += 0x60
-                class_id &= 0xff
-                result.append(class_id)
-            else:
-                result.append(ord('O'))
-                result.extend(self._encode_single_value(class_id))
-            for field_name in field_names:
-                result.extend(self._encode_single_value(value[field_name]))
-            return result
+            return self._encode_object(value)
         # 列表(list)类型，不可以使用tuple替代
         elif isinstance(value, list):
-            length = len(value)
-            if length == 0:
-                # 没有值则无法判断类型，一律返回null
-                return self._encode_single_value(None)
-            if isinstance(value[0], bool):
-                _type = '[boolean'
-            elif isinstance(value[0], int):
-                _type = '[int'
-            elif isinstance(value[0], float):
-                _type = '[double'
-            elif isinstance(value[0], str):
-                _type = '[string'
-            elif isinstance(value[0], Object):
-                _type = '[object'
-            else:
-                raise HessianTypeError('Unknown list type: {}'.format(value[0]))
-            if length < 0x7:
-                result.append(0x70 + length)
-                if _type not in self.types:
-                    self.types.append(_type)
-                    result.extend(self._encode_single_value(_type))
-                else:
-                    result.extend(self._encode_single_value(self.types.index(_type)))
-            else:
-                result.append(0x56)
-                if _type not in self.types:
-                    self.types.append(_type)
-                    result.extend(self._encode_single_value(_type))
-                else:
-                    result.extend(self._encode_single_value(self.types.index(_type)))
-                result.extend(self._encode_single_value(length))
-            for v in value:
-                if type(value[0]) != type(v):
-                    raise HessianTypeError('All elements in list must be the same type, first type'
-                                           ' is {0} but current type is {1}'.format(type(value[0]), type(v)))
-                result.extend(self._encode_single_value(v))
-            return result
+            return self._encode_list(value)
         elif value is None:
-            result.append(ord('N'))
-            return result
+            return [ord('N')]
         else:
             raise HessianTypeError('Unknown argument type: {}'.format(value))
 

@@ -37,6 +37,7 @@ class TestDubbo(unittest.TestCase):
         pretty_print(dubbo.call('echo2', False))
         pretty_print(dubbo.call('echo3', [1000000000, 0x7ff, 100000, 10000]))
         pretty_print(dubbo.call('echo4', [1.00000004, 100000.0, 1.0, 2.0, 0.0]))
+        self.assertEquals('🐶', dubbo.call('echo1', '🐶'))
         self.assertEquals(200, dubbo.call('echo5', 200))
         self.assertEquals(10000, dubbo.call('echo5', 10000))
 
