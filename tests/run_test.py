@@ -36,8 +36,8 @@ class TestDubbo(unittest.TestCase):
         zk = ZkRegister('172.19.71.7:2181')
         dubbo_cli = DubboClient('com.qianmi.pc.es.api.EsGoodsQueryProvider', zk_register=zk)
         product_request = Object('com.qianmi.pc.es.api.request.EsGoodsListByIdStringRequest', values={
-            'chainMasterId': 'A857713',
-            'idString': 'NotUsed:g10346'
+            'chainMasterId': 'A000000',
+            'idString': 'NotUsed:g10529'
         })
         result = dubbo_cli.call('listByIdString', product_request)
         pretty_print(result)

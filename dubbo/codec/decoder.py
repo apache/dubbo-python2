@@ -223,11 +223,12 @@ class Response(object):
             result[field_name] = field_value
 
         path = self.paths[ref]
-        if path in ('java.math.BigDecimal', 'java.math.BigInteger'):
-            # 从变量value中获取到真正的数值
+        if path == 'java.math.BigDecimal':
             result = float(result['value'])
-            if result == int(result):
-                result = int(result)
+            self.objects[-1] = result or 0
+        elif path == 'java.math.BigInteger':
+            result = int(result['value'])
+            self.objects[-1] = result
 
         return result
 
