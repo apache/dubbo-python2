@@ -2,7 +2,7 @@
 import logging
 import threading
 import time
-from random import randint
+import random
 from urllib import quote
 
 from kazoo.client import KazooClient
@@ -111,28 +111,30 @@ class ZkRegister(object):
         """
         if interface not in self.hosts:
             self.lock.acquire()
-            if interface not in self.hosts:
-                path = DUBBO_ZK_PROVIDERS.format(interface)
-                if self.zk.exists(path):
-                    providers = self.zk.get_children(path, watch=self._watch_children)
-                    providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
-                    if len(providers) == 0:
-                        raise RegisterException('no providers for interface {}'.format(interface))
-                    self._register_consumer(providers)
-                    self.hosts[interface] = map(lambda provider: provider['host'], providers)
+            try:
+                if interface not in self.hosts:
+                    path = DUBBO_ZK_PROVIDERS.format(interface)
+                    if self.zk.exists(path):
+                        providers = self.zk.get_children(path, watch=self._watch_children)
+                        providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
+                        if len(providers) == 0:
+                            raise RegisterException('no providers for interface {}'.format(interface))
+                        self._register_consumer(providers)
+                        self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
-                    # 试图从配置中取出权重相关的信息
-                    configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
-                                                         watch=self._watch_configurators)
-                    if configurators:
-                        configurators = map(parse_url, configurators)
-                        conf = {}
-                        for configurator in configurators:
-                            conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
-                        self.weights[interface] = conf
-                else:
-                    raise RegisterException('can\'t providers for interface {0}'.format(interface))
-            self.lock.release()
+                        # 试图从配置中取出权重相关的信息
+                        configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
+                                                             watch=self._watch_configurators)
+                        if configurators:
+                            configurators = map(parse_url, configurators)
+                            conf = {}
+                            for configurator in configurators:
+                                conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
+                            self.weights[interface] = conf
+                    else:
+                        raise RegisterException('can\'t providers for interface {0}'.format(interface))
+            finally:
+                self.lock.release()
         return self._routing_with_wight(interface)
 
     def _routing_with_wight(self, interface):
@@ -143,15 +145,15 @@ class ZkRegister(object):
         """
         hosts = self.hosts[interface]
         # 此接口没有权重设置，使用朴素的路由算法
-        if not self.weights.get(interface):
-            return hosts[randint(0, len(hosts) - 1)]
+        if interface not in self.weights:
+            return random.choice(hosts)
 
         weights = self.weights[interface]
         hosts_weight = []
         for host in hosts:
-            hosts_weight.append(int(weights.get(host, '100')))
+            hosts_weight.append(int(weights.get(host, 100)))
 
-        hit = randint(0, sum(hosts_weight) - 1)
+        hit = random.randint(0, sum(hosts_weight) - 1)
         for i in xrange(len(hosts)):
             if hit <= sum(hosts_weight[:i + 1]):
                 return hosts[i]

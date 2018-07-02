@@ -48,10 +48,7 @@ def double_to_long_bits(value):
     :param value:
     :return:
     """
-    if value != value:
-        return 0x7ff8000000000000L
-    else:
-        return struct.unpack('Q', struct.pack('d', value))[0]
+    return struct.unpack('Q', struct.pack('d', value))[0]
 
 
 def get_ip():

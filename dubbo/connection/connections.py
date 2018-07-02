@@ -247,6 +247,7 @@ class SelectConnectionPool(BaseConnectionPool):
         del self._connection_pool[conn.remote_host()]
 
 
+# connection_pool在整个进程中是单例的
 if hasattr(select, 'epoll'):
     connection_pool = EpollConnectionPool()
 else:
