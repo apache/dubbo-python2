@@ -167,6 +167,11 @@ class Request(object):
 
     @staticmethod
     def _encode_bool(value):
+        """
+        对bool类型进行编码
+        :param value:
+        :return:
+        """
         result = []
         if value:
             result.append(ord('T'))
@@ -176,8 +181,14 @@ class Request(object):
 
     @staticmethod
     def _encode_int(value):
+        """
+        对整数进行编码
+        :param value:
+        :return:
+        """
         result = []
         # 超出int类型范围的值则转化为long类型
+        # 这里问题在于对于落在int范围内的数字，我们无法判断其是long类型还是int类型，所以一律认为其是int类型
         if value > MAX_INT_32 or value < MIN_INT_32:
             result.append(ord('L'))
             result.extend(list(bytearray(struct.pack('!q', value))))
@@ -202,6 +213,11 @@ class Request(object):
 
     @staticmethod
     def _encode_float(value):
+        """
+        对浮点类型进行编码
+        :param value:
+        :return:
+        """
         result = []
         int_value = int(value)
         if int_value == value:
@@ -265,6 +281,11 @@ class Request(object):
         return result
 
     def _encode_str(self, value):
+        """
+        对一个字符串进行编码
+        :param value:
+        :return:
+        """
         result = []
         # 在进行网络传输操作时一律使用unicode进行操作
         if isinstance(value, str):
@@ -284,6 +305,11 @@ class Request(object):
         return result
 
     def _encode_object(self, value):
+        """
+        对一个对象进行编码
+        :param value:
+        :return:
+        """
         result = []
         path = value.get_path()
         field_names = value.keys()
@@ -310,6 +336,11 @@ class Request(object):
         return result
 
     def _encode_list(self, value):
+        """
+        对一个列表进行编码
+        :param value:
+        :return:
+        """
         result = []
         length = len(value)
         if length == 0:
@@ -373,6 +404,7 @@ class Request(object):
         # 列表(list)类型，不可以使用tuple替代
         elif isinstance(value, list):
             return self._encode_list(value)
+        # null
         elif value is None:
             return [ord('N')]
         else:

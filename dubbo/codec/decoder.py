@@ -416,9 +416,9 @@ class Response(object):
         return str(self.__data)
 
 
-def get_body_length(response_head):
+def parse_response_head(response_head):
     """
-    计算出响应体的长度
+    对响应头部的字节做解析
     :param response_head:
     :return:
     """

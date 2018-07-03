@@ -7,7 +7,7 @@ import time
 from struct import unpack, pack
 
 from dubbo.codec.encoder import Request
-from dubbo.codec.decoder import Response, get_body_length
+from dubbo.codec.decoder import Response, parse_response_head
 from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD, \
     TIMEOUT_CHECK_INTERVAL, TIMEOUT_IDLE, TIMEOUT_MAX_TIMES
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
@@ -116,7 +116,7 @@ class BaseConnectionPool(object):
             return
 
         try:
-            heartbeat, body_length = get_body_length(head)
+            heartbeat, body_length = parse_response_head(head)
         except DubboResponseException as e:  # 这里是dubbo的内部异常，与response中的业务异常不一样
             logger.exception(e)
             body_length = unpack('!i', head[12:])[0]
@@ -298,7 +298,6 @@ class Connection(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
         self.__sock = sock
-        self.__lock = threading.Lock()
         # Event是Condition的简单实现版本
         self.__event = threading.Event()
 
