@@ -12,7 +12,7 @@
 """
 import struct
 
-from dubbo.common.constants import *
+from dubbo.common.constants import MIN_INT_32, MAX_INT_32, DEFAULT_REQUEST_META
 from dubbo.common.exceptions import HessianTypeError
 from dubbo.common.util import double_to_long_bits, get_invoke_id
 
@@ -194,13 +194,13 @@ class Request(object):
             result.extend(list(bytearray(struct.pack('!q', value))))
             return result
 
-        if INT_DIRECT_MIN <= value <= INT_DIRECT_MAX:
-            result.append(value + BC_INT_ZERO)
-        elif INT_BYTE_MIN <= value <= INT_BYTE_MAX:
-            result.append(BC_INT_BYTE_ZERO + (value >> 8))
+        if -0x10 <= value <= 0x2f:
+            result.append(value + 0x90)
+        elif -0x800 <= value <= 0x7ff:
+            result.append(0xc8 + (value >> 8))
             result.append(value)
-        elif INT_SHORT_MIN <= value <= INT_SHORT_MAX:
-            result.append(BC_INT_SHORT_ZERO + (value >> 16))
+        elif -0x40000 <= value <= 0x3ffff:
+            result.append(0xd4 + (value >> 16))
             result.append(value >> 8)
             result.append(value)
         else:
@@ -222,24 +222,24 @@ class Request(object):
         int_value = int(value)
         if int_value == value:
             if int_value == 0:
-                result.append(BC_DOUBLE_ZERO)
+                result.append(0x5b)
                 return result
             elif int_value == 1:
-                result.append(BC_DOUBLE_ONE)
+                result.append(0x5c)
                 return result
             elif -0x80 <= int_value < 0x80:
-                result.append(BC_DOUBLE_BYTE)
+                result.append(0x5d)
                 result.append(int_value)
                 return result
             elif -0x8000 <= int_value < 0x8000:
-                result.append(BC_DOUBLE_SHORT)
+                result.append(0x5e)
                 result.append(int_value >> 8)
                 result.append(int_value)
                 return result
 
         mills = int(value * 1000)
         if 0.001 * mills == value and MIN_INT_32 <= mills <= MAX_INT_32:
-            result.append(BC_DOUBLE_MILL)
+            result.append(0x5f)
             result.append(mills >> 24)
             result.append(mills >> 16)
             result.append(mills >> 8)
@@ -291,10 +291,10 @@ class Request(object):
         if isinstance(value, str):
             value = value.decode('utf-8')
         length = len(value)
-        if length <= STRING_DIRECT_MAX:
-            result.append(BC_STRING_DIRECT + length)
-        elif length <= STRING_SHORT_MAX:
-            result.append(BC_STRING_SHORT + (length >> 8))
+        if length <= 0x1f:
+            result.append(0x00 + length)
+        elif length <= 0x3ff:
+            result.append(0x30 + (length >> 8))
             result.append(length)
         else:
             result.append(ord('S'))
