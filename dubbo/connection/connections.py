@@ -101,6 +101,11 @@ class BaseConnectionPool(object):
         raise NotImplementedError()
 
     def _read(self, conn):
+        """
+        从指定的连接读取数据
+        :param conn:
+        :return:
+        """
         host = conn.remote_host()
 
         # 数据的头部大小为16个字节
@@ -112,17 +117,29 @@ class BaseConnectionPool(object):
 
         try:
             heartbeat, body_length = get_body_length(head)
-        except DubboResponseException as e:
-            # 这里是dubbo的内部异常，与下面的业务异常不一样
+        except DubboResponseException as e:  # 这里是dubbo的内部异常，与response中的业务异常不一样
+            logger.exception(e)
             body_length = unpack('!i', head[12:])[0]
             body = conn.read(body_length)
             res = Response(body)
             error = res.read_next()
-            self.results[host] = DubboResponseException('\n{}\n{}'.format(e.message, error))
+            invoke_id = unpack('!q', head[4:12])[0]
+            self.results[invoke_id] = DubboResponseException('\n{}\n{}'.format(e.message, error))
             self.__event.set()
             return
         body = conn.read(body_length)
+        self._parse_remote_data(head, body, heartbeat, conn, host)
 
+    def _parse_remote_data(self, head, body, heartbeat, conn, host):
+        """
+        对从远程主机读取到的数据进行解析
+        :param head:
+        :param body:
+        :param heartbeat:
+        :param conn:
+        :param host:
+        :return:
+        """
         # 远程主机发送的心跳请求数据包
         if heartbeat == 2:
             logger.debug('❤ request  -> {}'.format(conn.remote_host()))
@@ -135,30 +152,48 @@ class BaseConnectionPool(object):
             self.client_heartbeats[host] -= 1
         # 普通的数据包
         else:
-            # 请求的调用id，目的是将请求和请求所对应的响应对应起来
-            invoke_id = unpack('!q', head[4:12])[0]
-            try:
-                res = Response(body)
-                flag = res.read_int()
-                if flag == 2:  # 响应的值为NULL
-                    self.results[invoke_id] = None
-                elif flag == 1:  # 正常的响应值
-                    result = res.read_next()
-                    self.results[invoke_id] = result
-                elif flag == 0:  # 异常的响应值
-                    err = res.read_error()
-                    error = '\n{cause}: {detailMessage}\n'.format(**err)
-                    stack_trace = err['stackTrace']
-                    for trace in stack_trace:
-                        error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
-                    self.results[invoke_id] = DubboResponseException(error)
-                else:
-                    raise DubboResponseException("Unknown result flag, expect '0' '1' '2', get " + flag)
-            except Exception as e:
-                logger.exception(e)
-                self.results[invoke_id] = e
-            finally:
-                self.__event.set()  # 唤醒请求线程
+            self._parse_response(head, body)
+
+    def _parse_response(self, head, body):
+        """
+        对dubbo的响应数据进行解析
+        :param head:
+        :param body:
+        :return:
+        """
+        # 请求的调用id，目的是将请求和请求所对应的响应对应起来
+        invoke_id = unpack('!q', head[4:12])[0]
+        try:
+            res = Response(body)
+            flag = res.read_int()
+            if flag == 2:  # 响应的值为NULL
+                self.results[invoke_id] = None
+            elif flag == 1:  # 正常的响应值
+                result = res.read_next()
+                self.results[invoke_id] = result
+            elif flag == 0:  # 异常的响应值
+                self.results[invoke_id] = self._parse_error(res)
+            else:
+                raise DubboResponseException("Unknown result flag, expect '0' '1' '2', get " + flag)
+        except Exception as e:
+            logger.exception(e)
+            self.results[invoke_id] = e
+        finally:
+            self.__event.set()  # 唤醒请求线程
+
+    @staticmethod
+    def _parse_error(res):
+        """
+        对Java的异常错误信息进行解析
+        :param res:
+        :return:
+        """
+        err = res.read_error()
+        error = '\n{cause}: {detailMessage}\n'.format(**err)
+        stack_trace = err['stackTrace']
+        for trace in stack_trace:
+            error += '	at {declaringClass}.{methodName}({fileName}:{lineNumber})\n'.format(**trace)
+        return DubboResponseException(error)
 
     def _send_heartbeat(self):
         """

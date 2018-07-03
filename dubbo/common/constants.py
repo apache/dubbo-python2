@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from util import num_2_byte_list
+from dubbo.common.util import num_2_byte_list
 
 # 服务端的响应码
 response_status_message = {

@@ -10,7 +10,7 @@ from kazoo.client import KazooClient
 from dubbo.common.constants import DUBBO_ZK_PROVIDERS, DUBBO_ZK_CONFIGURATORS, DUBBO_ZK_CONSUMERS
 from dubbo.common.exceptions import RegisterException
 from dubbo.common.util import parse_url, get_pid, get_ip
-from connection.connections import connection_pool
+from dubbo.connection.connections import connection_pool
 
 logger = logging.getLogger('dubbo')
 
@@ -132,7 +132,7 @@ class ZkRegister(object):
         """
         providers = self.zk.get_children(path, watch=self._watch_children)
         providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
-        if len(providers) == 0:
+        if not providers:
             raise RegisterException('no providers for interface {}'.format(interface))
         self._register_consumer(providers)
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
@@ -163,7 +163,7 @@ class ZkRegister(object):
         providers = self.zk.get_children(path, watch=self._watch_children)
         logger.debug('{} providers: {}'.format(interface, providers))
         providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
-        if len(providers) == 0:
+        if not providers:
             logger.debug('no providers for interface {}'.format(interface))
             del self.hosts[interface]
             return
