@@ -216,12 +216,10 @@ class ZkRegister(object):
             'version': provider_fields['version'],
         }
 
-        keys = fields.keys()
-        keys.sort()
-        for key in keys:
-            value = fields[key]
-            consumer += '{0}={1}&'.format(key, value)
-        consumer = consumer[:-1]  # 干掉最后一个&
+        params = []
+        for key, value in sorted(fields.items()):
+            params.append('{0}={1}'.format(key, value))
+        consumer += '&'.join(params)
 
         consumer_path = DUBBO_ZK_CONSUMERS.format(fields['interface'])
         self.zk.ensure_path(consumer_path)
