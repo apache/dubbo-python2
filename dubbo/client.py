@@ -115,50 +115,41 @@ class ZkRegister(object):
                 if interface not in self.hosts:
                     path = DUBBO_ZK_PROVIDERS.format(interface)
                     if self.zk.exists(path):
-                        providers = self.zk.get_children(path, watch=self._watch_children)
-                        providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
-                        if len(providers) == 0:
-                            raise RegisterException('no providers for interface {}'.format(interface))
-                        self._register_consumer(providers)
-                        self.hosts[interface] = map(lambda provider: provider['host'], providers)
-
-                        # 试图从配置中取出权重相关的信息
-                        configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
-                                                             watch=self._watch_configurators)
-                        if configurators:
-                            configurators = map(parse_url, configurators)
-                            conf = {}
-                            for configurator in configurators:
-                                conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
-                            self.weights[interface] = conf
+                        self._get_providers_from_zk(path, interface)
+                        self._get_configurators_from_zk(interface)
                     else:
-                        raise RegisterException('can\'t providers for interface {0}'.format(interface))
+                        raise RegisterException('No providers for interface {0}'.format(interface))
             finally:
                 self.lock.release()
         return self._routing_with_wight(interface)
 
-    def _routing_with_wight(self, interface):
+    def _get_providers_from_zk(self, path, interface):
         """
-        根据接口名称以及配置好的权重信息获取一个host
+        从zk中根据interface获取到providers信息
+        :param path:
         :param interface:
         :return:
         """
-        hosts = self.hosts[interface]
-        # 此接口没有权重设置，使用朴素的路由算法
-        if interface not in self.weights:
-            return random.choice(hosts)
+        providers = self.zk.get_children(path, watch=self._watch_children)
+        providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
+        if len(providers) == 0:
+            raise RegisterException('no providers for interface {}'.format(interface))
+        self._register_consumer(providers)
+        self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
-        weights = self.weights[interface]
-        hosts_weight = []
-        for host in hosts:
-            hosts_weight.append(int(weights.get(host, 100)))
-
-        hit = random.randint(0, sum(hosts_weight) - 1)
-        for i in xrange(len(hosts)):
-            if hit <= sum(hosts_weight[:i + 1]):
-                return hosts[i]
-
-        raise RegisterException('error for finding [{}] host with weight.'.format(interface))
+    def _get_configurators_from_zk(self, interface):
+        """
+        试图从配置中取出权重相关的信息
+        :param interface:
+        :return:
+        """
+        configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface), watch=self._watch_configurators)
+        if configurators:
+            configurators = map(parse_url, configurators)
+            conf = {}
+            for configurator in configurators:
+                conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
+            self.weights[interface] = conf
 
     def _watch_children(self, event):
         """
@@ -235,6 +226,29 @@ class ZkRegister(object):
         consumer_path = DUBBO_ZK_CONSUMERS.format(fields['interface'])
         self.zk.ensure_path(consumer_path)
         self.zk.create_async(consumer_path + '/' + quote(consumer, safe=''), ephemeral=True)
+
+    def _routing_with_wight(self, interface):
+        """
+        根据接口名称以及配置好的权重信息获取一个host
+        :param interface:
+        :return:
+        """
+        hosts = self.hosts[interface]
+        # 此接口没有权重设置，使用朴素的路由算法
+        if interface not in self.weights:
+            return random.choice(hosts)
+
+        weights = self.weights[interface]
+        hosts_weight = []
+        for host in hosts:
+            hosts_weight.append(int(weights.get(host, 100)))
+
+        hit = random.randint(0, sum(hosts_weight) - 1)
+        for i in xrange(len(hosts)):
+            if hit <= sum(hosts_weight[:i + 1]):
+                return hosts[i]
+
+        raise RegisterException('error for finding [{}] host with weight.'.format(interface))
 
     def close(self):
         self.zk.stop()
