@@ -54,9 +54,7 @@ class DubboClient(object):
                         * double
                         * java.lang.String
                         * java.lang.Object
-        :param timeout: 请求超时时间（秒），不设置则不会超时。默认不设置，如无特殊需求不建议设置
-                    * 不设置超时时间在某些极限情况下可能导致此连接一直阻塞；
-                    * 设置超时时间会增加远程调用的时间；
+        :param timeout: 请求超时时间（秒），不设置则不会超时
         :return:
         """
         if not isinstance(args, (list, tuple)):

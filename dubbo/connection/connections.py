@@ -26,7 +26,7 @@ class BaseConnectionPool(object):
         self.client_heartbeats = {}
         # 创建连接的锁
         self.__conn_lock = threading.Lock()
-        self.__event = threading.Event()
+        self.__events = {}
 
         reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
@@ -40,20 +40,16 @@ class BaseConnectionPool(object):
         conn = self._get_connection(host)
         request = Request(request_param)
         request_data = request.encode()
-        request_invoke_id = request.invoke_id
+        invoke_id = request.invoke_id
 
+        event = threading.Event()
+        self.__events[invoke_id] = event
+        # 发送数据
         conn.write(request_data)
-        since_request = time.time()  # 从发出请求开始计时
-
-        # 这里的实现很不严谨，我试图使用别的线程的唤醒事件来避免某个未设置超时的线程永远阻塞
-        default_timeout = timeout or 60
-        while request_invoke_id not in self.results:
-            if time.time() - since_request > default_timeout:
-                raise DubboRequestTimeoutException(
-                    "Socket(host='{}'): Read timed out. (read timeout={})".format(host, default_timeout))
-            self.__event.clear()
-            self.__event.wait(timeout=timeout)
-        result = self.results.pop(request_invoke_id)
+        event.wait(timeout)
+        # 此event已经无效，应该删除
+        del self.__events[invoke_id]
+        result = self.results.pop(invoke_id)
 
         if isinstance(result, Exception):
             raise result
@@ -125,7 +121,7 @@ class BaseConnectionPool(object):
             error = res.read_next()
             invoke_id = unpack('!q', head[4:12])[0]
             self.results[invoke_id] = DubboResponseException('\n{}\n{}'.format(e.message, error))
-            self.__event.set()
+            self.__events[invoke_id].set()
             return
         body = conn.read(body_length)
         self._parse_remote_data(head, body, heartbeat, conn, host)
@@ -179,7 +175,7 @@ class BaseConnectionPool(object):
             logger.exception(e)
             self.results[invoke_id] = e
         finally:
-            self.__event.set()  # 唤醒请求线程
+            self.__events[invoke_id].set()  # 唤醒请求线程
 
     @staticmethod
     def _parse_error(res):

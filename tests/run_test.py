@@ -16,9 +16,6 @@ class TestDubbo(unittest.TestCase):
         self.dubbo = DubboClient('com.qianmi.pc.es.api.EsGoodsQueryProvider', zk_register=zk)
 
     def test_run(self):
-        # for i in xrange(10):
-        #     thread = threading.Thread(target=run, args=(self.dubbo,))
-        #     thread.start()
         # goods_query_request = Object('com.qianmi.pc.es.api.request.EsGoodsQueryRequest', values={
         #     'chainMasterId': 'A859315',
         #     'fromSys': 2,
@@ -33,14 +30,20 @@ class TestDubbo(unittest.TestCase):
         # result = self.dubbo.call('listByIdString', goods_list_by_id_request)
         # pretty_print(result)
 
-        zk = ZkRegister('172.19.71.7:2181')
-        dubbo_cli = DubboClient('com.qianmi.pc.es.api.EsGoodsQueryProvider', zk_register=zk)
-        product_request = Object('com.qianmi.pc.es.api.request.EsGoodsListByIdStringRequest', values={
-            'chainMasterId': 'A000000',
-            'idString': 'NotUsed:g10529'
-        })
-        result = dubbo_cli.call('listByIdString', product_request)
-        pretty_print(result)
+        # zk = ZkRegister('172.19.71.7:2181')
+        # dubbo_cli = DubboClient('com.qianmi.pc.es.api.EsGoodsQueryProvider', zk_register=zk)
+        # product_request = Object('com.qianmi.pc.es.api.request.EsGoodsListByIdStringRequest', values={
+        #     'chainMasterId': 'A000000',
+        #     'idString': 'NotUsed:g10529'
+        # })
+        # result = dubbo_cli.call('listByIdString', product_request)
+        # pretty_print(result)
+
+        zk = ZkRegister('127.0.0.1:2181')
+        dubbo_cli = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
+        for i in xrange(4):
+            thread = threading.Thread(target=run, args=(dubbo_cli,))
+            thread.start()
 
 
 def pretty_print(value):
@@ -48,8 +51,8 @@ def pretty_print(value):
 
 
 def run(_dubbo):
-    for j in xrange(1000):
-        _dubbo.call('echo18', timeout=1)
+    for j in xrange(100000):
+        _dubbo.call('echo18')
 
 
 if __name__ == '__main__':
