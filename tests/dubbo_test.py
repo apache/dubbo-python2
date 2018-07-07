@@ -274,6 +274,32 @@ class TestDubbo(unittest.TestCase):
         batch_spu_request = spu_query_provider.call('listByIds', spu_ids_request)
         pretty_print(batch_spu_request)
 
+    def test_pc_es_center(self):
+        zk = ZkRegister('172.19.71.7:2181')
+        dubbo_cli = DubboClient('com.qianmi.pc.es.api.EsGoodsQueryProvider', zk_register=zk)
+
+        goods_query_request = Object('com.qianmi.pc.es.api.request.EsGoodsQueryRequest', values={
+            'chainMasterId': 'A859315',
+            'fromSys': 2,
+            'pageNum': 50
+        })
+        result = dubbo_cli.call('query', goods_query_request)
+        pretty_print(result)
+
+        goods_list_by_id_request = Object('com.qianmi.pc.es.api.request.EsGoodsListByIdStringRequest', values={
+            'chainMasterId': 'A859315',
+            'idString': 'g51426:g51422'
+        })
+        result = dubbo_cli.call('listByIdString', goods_list_by_id_request)
+        pretty_print(result)
+
+        product_request = Object('com.qianmi.pc.es.api.request.EsGoodsListByIdStringRequest', values={
+            'chainMasterId': 'A000000',
+            'idString': 'NotUsed:g10529'
+        })
+        result = dubbo_cli.call('listByIdString', product_request)
+        pretty_print(result)
+
 
 if __name__ == '__main__':
     # test = TestDubbo()

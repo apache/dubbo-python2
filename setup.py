@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='python-dubbo',
-    version='0.0.3-beta7',
+    version='0.0.3-beta8',
     url='https://github.com/RitterHou/python-dubbo',
     author='hourui',
     author_email='hourui@qianmi.com',
