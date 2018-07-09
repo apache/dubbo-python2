@@ -47,10 +47,13 @@ class BaseConnectionPool(object):
         # 发送数据
         conn.write(request_data)
         event.wait(timeout)
-        # 此event已经无效，应该删除
         del self.__events[invoke_id]
-        result = self.results.pop(invoke_id)
 
+        if invoke_id not in self.results:
+            err = "Socket(host='{}'): Read timed out. (read timeout={})".format(host, timeout)
+            raise DubboRequestTimeoutException(err)
+
+        result = self.results.pop(invoke_id)
         if isinstance(result, Exception):
             raise result
         return result
