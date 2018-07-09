@@ -38,7 +38,7 @@ class Object(object):
         return self.__values[key]
 
     def __setitem__(self, key, value):
-        if not isinstance(key, str):
+        if not isinstance(key, (str, unicode)):
             raise ValueError('Object key {} should be string type.'.format(key))
         self.__values[key] = value
 
