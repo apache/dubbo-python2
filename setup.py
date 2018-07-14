@@ -8,7 +8,6 @@ setup(
     author='hourui',
     author_email='hourui@qianmi.com',
     description='Python Dubbo Client.',
-    long_description=open('README.md').read(),
     license='Apache License 2.0',
     packages=find_packages(),
     classifiers=[
