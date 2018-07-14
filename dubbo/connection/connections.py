@@ -46,7 +46,7 @@ class BaseConnectionPool(object):
         self.conn_events[invoke_id] = event
         # 发送数据
         conn.write(request_data)
-        event.wait(timeout)
+        event.wait(timeout)s
         del self.conn_events[invoke_id]
 
         if invoke_id not in self.results:
