@@ -25,8 +25,8 @@ class BaseConnectionPool(object):
         # 保存客户端已经发生超时的心跳次数
         self.client_heartbeats = {}
         # 创建连接的锁
-        self.__conn_lock = threading.Lock()
-        self.__events = {}
+        self.conn_lock = threading.Lock()
+        self.conn_events = {}
 
         reading_thread = threading.Thread(target=self._read_from_server)
         reading_thread.setDaemon(True)  # 当主线程退出时此线程同时退出
@@ -43,11 +43,11 @@ class BaseConnectionPool(object):
         invoke_id = request.invoke_id
 
         event = threading.Event()
-        self.__events[invoke_id] = event
+        self.conn_events[invoke_id] = event
         # 发送数据
         conn.write(request_data)
         event.wait(timeout)
-        del self.__events[invoke_id]
+        del self.conn_events[invoke_id]
 
         if invoke_id not in self.results:
             err = "Socket(host='{}'): Read timed out. (read timeout={})".format(host, timeout)
@@ -67,13 +67,13 @@ class BaseConnectionPool(object):
         if not host or ':' not in host:
             raise ValueError('invalid host {}'.format(host))
         if host not in self._connection_pool:
-            self.__conn_lock.acquire()
+            self.conn_lock.acquire()
             try:
                 if host not in self._connection_pool:
                     self.client_heartbeats[host] = 0
                     self._new_connection(host)
             finally:
-                self.__conn_lock.release()
+                self.conn_lock.release()
         return self._connection_pool[host]
 
     def _new_connection(self, host):
@@ -124,7 +124,7 @@ class BaseConnectionPool(object):
             error = res.read_next()
             invoke_id = unpack('!q', head[4:12])[0]
             self.results[invoke_id] = DubboResponseException('\n{}\n{}'.format(e.message, error))
-            self.__events[invoke_id].set()
+            self.conn_events[invoke_id].set()
             return
         body = conn.read(body_length)
         self._parse_remote_data(head, body, heartbeat, conn, host)
@@ -178,7 +178,7 @@ class BaseConnectionPool(object):
             logger.exception(e)
             self.results[invoke_id] = e
         finally:
-            self.__events[invoke_id].set()  # 唤醒请求线程
+            self.conn_events[invoke_id].set()  # 唤醒请求线程
 
     @staticmethod
     def _parse_error(res):
@@ -297,9 +297,6 @@ class Connection(object):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
         self.__sock = sock
-        # Event是Condition的简单实现版本
-        self.__event = threading.Event()
-
         self.__host = '{0}:{1}'.format(host, port)
         self.last_active = time.time()
 
