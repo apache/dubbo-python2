@@ -3,13 +3,13 @@ from setuptools import setup, find_packages
 
 setup(
     name='python-dubbo',
-    version='0.0.3-beta11',
+    version='0.0.3-beta12',
     url='https://github.com/RitterHou/python-dubbo',
     author='hourui',
     author_email='hourui@qianmi.com',
     description='Python Dubbo Client.',
     license='Apache License 2.0',
-    packages=find_packages(),
+    packages=find_packages(exclude=['tests', 'tools']),
     classifiers=[
         'Environment :: Console',
         'Intended Audience :: Developers',
