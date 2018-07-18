@@ -282,10 +282,11 @@ class SelectConnectionPool(BaseConnectionPool):
 
 
 # connection_pool在整个进程中是单例的
-if hasattr(select, 'epoll'):
-    connection_pool = EpollConnectionPool()
-else:
-    connection_pool = SelectConnectionPool()
+# if hasattr(select, 'epoll'):
+#     connection_pool = EpollConnectionPool()
+# else:
+#     connection_pool = SelectConnectionPool()
+connection_pool = SelectConnectionPool()
 
 
 class Connection(object):
