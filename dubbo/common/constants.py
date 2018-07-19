@@ -40,3 +40,8 @@ TIMEOUT_CHECK_INTERVAL = 0.03  # 30ms
 TIMEOUT_IDLE = 60
 # 连接允许的最多的超时次数
 TIMEOUT_MAX_TIMES = 3
+
+# 数据的头部大小为16个字节
+# 读取的数据类型：1 head; 2 error_body; 3 common_body;
+# 头部信息不存在invoke_id，所以为None
+DEFAULT_READ_PARAMS = 16, 1, None
