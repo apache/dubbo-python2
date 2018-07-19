@@ -292,6 +292,8 @@ class Connection(object):
 
         self.last_active = time.time()
 
+        self.write_lock = threading.Lock()
+
     def fileno(self):
         """
         https://stackoverflow.com/a/39328021/4614538
@@ -305,17 +307,27 @@ class Connection(object):
         :param data:
         :return:
         """
-        self.write_buffer.extend(list(data))
+        self.write_lock.acquire()
+        try:
+            self.write_buffer.extend(list(data))
+        finally:
+            self.write_lock.release()
 
     def write(self):
         """
         向远程主机写数据
         :return:
         """
-        if len(self.write_buffer) > 0:
-            length = self.__sock.send(bytearray(self.write_buffer))
-            self.write_buffer = self.write_buffer[length:]
-            self.last_active = time.time()
+        if len(self.write_buffer) == 0:
+            return
+        self.write_lock.acquire()
+        try:
+            if len(self.write_buffer) > 0:
+                length = self.__sock.send(bytearray(self.write_buffer))
+                self.write_buffer = self.write_buffer[length:]
+                self.last_active = time.time()
+        finally:
+            self.write_lock.release()
 
     def read(self, callback):
         """
