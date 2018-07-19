@@ -9,7 +9,7 @@ from struct import unpack, pack
 from dubbo.codec.encoder import Request
 from dubbo.codec.decoder import Response, parse_response_head
 from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, CLI_HEARTBEAT_REQ_HEAD, \
-    TIMEOUT_CHECK_INTERVAL, TIMEOUT_IDLE, TIMEOUT_MAX_TIMES
+    TIMEOUT_CHECK_INTERVAL, TIMEOUT_IDLE, TIMEOUT_MAX_TIMES, DEFAULT_READ_PARAMS
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
 from dubbo.common.util import get_invoke_id
 
@@ -26,6 +26,7 @@ class BaseConnectionPool(object):
         self.client_heartbeats = {}
         # 创建连接的锁
         self.conn_lock = threading.Lock()
+        # 用于在数据读取完毕之后唤醒主线程
         self.conn_events = {}
 
         reading_thread = threading.Thread(target=self._read_from_server)
@@ -37,6 +38,13 @@ class BaseConnectionPool(object):
         scanning_thread.start()
 
     def get(self, host, request_param, timeout=None):
+        """
+        执行远程调用获取数据
+        :param host:
+        :param request_param:
+        :param timeout:
+        :return:
+        """
         conn = self._get_connection(host)
         request = Request(request_param)
         request_data = request.encode()
@@ -45,7 +53,7 @@ class BaseConnectionPool(object):
         event = threading.Event()
         self.conn_events[invoke_id] = event
         # 发送数据
-        conn.write(request_data)
+        conn.send(request_data)
         event.wait(timeout)
         del self.conn_events[invoke_id]
 
@@ -99,69 +107,91 @@ class BaseConnectionPool(object):
         """
         raise NotImplementedError()
 
-    def _read(self, conn):
+    def _callback(self, data, conn, data_type, invoke_id):
         """
-        从指定的连接读取数据
-        :param conn:
+        读取的数据满足之后触发的回调函数，由于connection是共有
+        的，所以我们要把这一大坨和连接相关的状态保存在各自连接中
+        :param data: 收到的数据
+        :param conn: 对应的连接
+        :param data_type:
+                1 头部
+                2 因为头部的解析错误，需要被读取的错误body
+                3 正确的body
+        :param invoke_id
         :return:
+            next_read_length 下一次读取需要读取的数据长度
+            next_read_type   下一次读取需要读取的数据类型
+            invoke_id        此次调用的id
         """
-        host = conn.remote_host()
-
-        # 数据的头部大小为16个字节
-        head = conn.read(16)
-        if not head:  # 连接已关闭
+        # 关闭连接
+        if not data:
+            host = conn.remote_host()
             logger.debug('{} closed by remote server'.format(host))
             self._delete_connection(conn)
-            return
+            return 0, 0, 0
 
-        try:
-            heartbeat, body_length = parse_response_head(head)
-        except DubboResponseException as e:  # 这里是dubbo的内部异常，与response中的业务异常不一样
-            logger.exception(e)
-            body_length = unpack('!i', head[12:])[0]
-            body = conn.read(body_length)
-            res = Response(body)
+        if data_type == 1:
+            return self._parse_head(data, conn)
+        elif data_type == 2:
+            res = Response(data)
             error = res.read_next()
-            invoke_id = unpack('!q', head[4:12])[0]
-            self.results[invoke_id] = DubboResponseException('\n{}\n{}'.format(e.message, error))
-            self.conn_events[invoke_id].set()
-            return
-        body = conn.read(body_length)
-        self._parse_remote_data(head, body, heartbeat, conn, host)
 
-    def _parse_remote_data(self, head, body, heartbeat, conn, host):
+            self.results[invoke_id] = DubboResponseException('\n{}'.format(error))
+            self.conn_events[invoke_id].set()
+            # 下一次继续读取新的头部数据
+            return DEFAULT_READ_PARAMS
+        elif data_type == 3:
+            self._parse_response(invoke_id, data)
+            # 下一次继续读取新的头部数据
+            return DEFAULT_READ_PARAMS
+        else:
+            raise RuntimeError('Unknown data type {}.'.format(data_type))
+
+    def _parse_head(self, data, conn):
         """
-        对从远程主机读取到的数据进行解析
-        :param head:
-        :param body:
-        :param heartbeat:
+        对dubbo响应的头部信息进行解析
+        :param data:
         :param conn:
-        :param host:
         :return:
         """
+        try:
+            heartbeat, body_length = parse_response_head(data)
+        except DubboResponseException as e:  # 这里是dubbo的内部异常，与response中的业务异常不一样
+            logger.exception(e)
+            body_length = unpack('!i', data[12:])[0]
+            # 获取响应的invoke_id
+            invoke_id = unpack('!q', data[4:12])[0]
+            # 下一次需要读取错误的响应体
+            return body_length, 2, invoke_id
         # 远程主机发送的心跳请求数据包
         if heartbeat == 2:
             logger.debug('❤ request  -> {}'.format(conn.remote_host()))
-            msg_id = head[4:12]
+            msg_id = data[4:12]
             heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
-            conn.write(bytearray(heartbeat_response))
+            conn.send(bytearray(heartbeat_response))
+            # 下一次继续读取新的头部数据
+            return DEFAULT_READ_PARAMS
         # 远程主机发送的心跳响应数据包
         elif heartbeat == 1:
             logger.debug('❤ response -> {}'.format(conn.remote_host()))
+            host = conn.remote_host()
             self.client_heartbeats[host] -= 1
+            # 下一次继续读取新的头部数据
+            return DEFAULT_READ_PARAMS
         # 普通的数据包
         else:
-            self._parse_response(head, body)
+            # 获取响应的invoke_id
+            invoke_id = unpack('!q', data[4:12])[0]
+            # 下一次读取正常的响应体
+            return body_length, 3, invoke_id
 
-    def _parse_response(self, head, body):
+    def _parse_response(self, invoke_id, body):
         """
         对dubbo的响应数据进行解析
-        :param head:
+        :param invoke_id:
         :param body:
         :return:
         """
-        # 请求的调用id，目的是将请求和请求所对应的响应对应起来
-        invoke_id = unpack('!q', head[4:12])[0]
         try:
             res = Response(body)
             flag = res.read_int()
@@ -202,53 +232,35 @@ class BaseConnectionPool(object):
         while 1:
             starting = time.time()
             for host in self._connection_pool.keys():
-                conn = self._connection_pool[host]
-                if time.time() - conn.last_active > TIMEOUT_IDLE:
-                    if self.client_heartbeats[host] >= TIMEOUT_MAX_TIMES:
-                        self._delete_connection(conn)
-                        conn.close()  # 客户端主动关闭连接
-                        logger.debug('{} closed by client'.format(host))
-                        continue
-                    self.client_heartbeats[host] += 1
-                    invoke_id = list(bytearray(pack('!q', get_invoke_id())))
-                    req = CLI_HEARTBEAT_REQ_HEAD + invoke_id + CLI_HEARTBEAT_TAIL
-                    conn.write(bytearray(req))
+                self._check_conn(host)
             ending = time.time()
             time_delta = ending - starting
             if time_delta < TIMEOUT_CHECK_INTERVAL:
                 time.sleep(TIMEOUT_CHECK_INTERVAL - time_delta)
 
+    def _check_conn(self, host):
+        """
+        对连接进行检查，查看是否超时或者已经达到最大的超时次数
+        :param host:
+        :return:
+        """
+        conn = self._connection_pool[host]
+        # 如果未达到最大的超时时间，则不进行任何操作
+        if time.time() - conn.last_active <= TIMEOUT_IDLE:
+            return
 
-class EpollConnectionPool(BaseConnectionPool):
-    """
-    epoll模型只支持Linux及其发行版
-    """
+        # 达到最大的超时次数，移除此连接
+        if self.client_heartbeats[host] >= TIMEOUT_MAX_TIMES:
+            self._delete_connection(conn)
+            conn.close()  # 客户端主动关闭连接
+            logger.debug('{} closed by client'.format(host))
 
-    def __init__(self):
-        self.__fds = {}  # 文件描述符所对应的连接
-        self.__epoll = select.epoll()
-        BaseConnectionPool.__init__(self)
-
-    def _read_from_server(self):
-        while 1:
-            events = self.__epoll.poll(1)
-            for fd, event in events:
-                if event & select.EPOLLIN:
-                    conn = self.__fds[fd]
-                    self._read(conn)
-
-    def _new_connection(self, host):
-        ip, port = host.split(':')
-        conn = Connection(ip, int(port))
-        self.__epoll.register(conn.fileno(), select.EPOLLIN)
-        self.__fds[conn.fileno()] = conn
-
-        self._connection_pool[host] = conn
-
-    def _delete_connection(self, conn):
-        self.__epoll.unregister(conn.fileno())
-        host = conn.remote_host()
-        del self._connection_pool[host]
+        # 未达到最大的超时次数，超时次数+1且发送心跳包
+        else:
+            self.client_heartbeats[host] += 1
+            invoke_id = list(bytearray(pack('!q', get_invoke_id())))
+            req = CLI_HEARTBEAT_REQ_HEAD + invoke_id + CLI_HEARTBEAT_TAIL
+            conn.send(bytearray(req))
 
 
 class SelectConnectionPool(BaseConnectionPool):
@@ -264,12 +276,14 @@ class SelectConnectionPool(BaseConnectionPool):
         while 1:
             try:
                 conns = self._connection_pool.values()
-                readable, writeable, exceptional = select.select(conns, [], [], self.select_timeout)
+                readable, writeable, exceptional = select.select(conns, conns, [], self.select_timeout)
             except select.error as e:
                 logger.exception(e)
                 break
+            for conn in writeable:
+                conn.write()
             for conn in readable:
-                self._read(conn)
+                conn.read(self._callback)
 
     def _new_connection(self, host):
         ip, port = host.split(':')
@@ -282,10 +296,6 @@ class SelectConnectionPool(BaseConnectionPool):
 
 
 # connection_pool在整个进程中是单例的
-# if hasattr(select, 'epoll'):
-#     connection_pool = EpollConnectionPool()
-# else:
-#     connection_pool = SelectConnectionPool()
 connection_pool = SelectConnectionPool()
 
 
@@ -297,34 +307,74 @@ class Connection(object):
     def __init__(self, host, port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((host, port))
+        # 在创建好连接之后设置IO为非阻塞
+        sock.setblocking(False)
         self.__sock = sock
         self.__host = '{0}:{1}'.format(host, port)
+
+        self.read_length, self.read_type, self.invoke_id = DEFAULT_READ_PARAMS
+        self.read_buffer = []
+        self.write_buffer = []
+        self.write_lock = threading.Lock()
+
         self.last_active = time.time()
 
     def fileno(self):
         """
+        Get file descriptor
         https://stackoverflow.com/a/39328021/4614538
         :return:
         """
         return self.__sock.fileno()
 
-    def write(self, data):
+    def send(self, data):
         """
-        向远程主机写数据
+        客户端执行发送操作
         :param data:
         :return:
         """
-        self.last_active = time.time()
-        self.__sock.sendall(data)
+        self.write_lock.acquire()
+        try:
+            self.write_buffer.extend(list(data))
+        finally:
+            self.write_lock.release()
 
-    def read(self, length):
+    def write(self):
+        """
+        向远程主机写数据
+        :return:
+        """
+        if len(self.write_buffer) == 0:
+            return
+        self.write_lock.acquire()
+        try:
+            if len(self.write_buffer) > 0:
+                length = self.__sock.send(bytearray(self.write_buffer))
+                self.write_buffer = self.write_buffer[length:]
+                self.last_active = time.time()
+        finally:
+            self.write_lock.release()
+
+    def read(self, callback):
         """
         读取远程主机的数据
-        :param length:
+        :param callback:
         :return:
         """
         self.last_active = time.time()
-        return bytearray(self.__sock.recv(length, socket.MSG_WAITALL))
+
+        data = list(bytearray(self.__sock.recv(self.read_length - len(self.read_buffer))))
+        # 断开连接
+        if not data:
+            callback([], self, None, None)
+            return
+
+        self.read_buffer.extend(data)
+        # 数据读取已经满足要求
+        if len(self.read_buffer) == self.read_length:
+            self.read_length, self.read_type, self.invoke_id \
+                = callback(bytearray(self.read_buffer), self, self.read_type, self.invoke_id)
+            self.read_buffer = []
 
     def close(self):
         """
