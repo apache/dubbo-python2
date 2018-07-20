@@ -54,15 +54,21 @@ class BaseConnectionPool(object):
         self.conn_events[invoke_id] = event
         # 发送数据
         conn.send(request_data)
+        logger.info('Data has been send for request id {}'.format(invoke_id))
+
+        start = time.time()
         event.wait(timeout)
+        end = time.time()
         del self.conn_events[invoke_id]
 
         if invoke_id not in self.results:
+            logger.warn('timeout is {} and programming waited {}'.format(timeout, end - start))
             err = "Socket(host='{}'): Read timed out. (read timeout={})".format(host, timeout)
             raise DubboRequestTimeoutException(err)
 
         result = self.results.pop(invoke_id)
         if isinstance(result, Exception):
+            logger.exception(result)
             raise result
         return result
 
@@ -129,6 +135,9 @@ class BaseConnectionPool(object):
             logger.debug('{} closed by remote server'.format(host))
             self._delete_connection(conn)
             return 0, 0, 0
+
+        if invoke_id is not None:
+            logger.info('Data has been received for request id {}'.format(invoke_id))
 
         if data_type == 1:
             return self._parse_head(data, conn)
