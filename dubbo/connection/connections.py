@@ -136,9 +136,8 @@ class BaseConnectionPool(object):
             self._delete_connection(conn)
             return 0, 0, 0
 
-        logger.info('Data has been received in head with invoke id {}'.format(unpack('!q', data[4:12])[0]))
-
         if data_type == 1:
+            logger.info('Head has been received in head with invoke id {}'.format(unpack('!q', data[4:12])[0]))
             return self._parse_head(data, conn)
         elif data_type == 2:
             res = Response(data)
