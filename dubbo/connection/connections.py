@@ -203,7 +203,7 @@ class BaseConnectionPool(object):
         :return:
         """
         # 没有invoke_id则意味着这是心跳的响应体，无需处理
-        if not invoke_id:
+        if invoke_id is None:
             return
 
         try:
