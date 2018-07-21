@@ -163,7 +163,7 @@ class ZkRegister(object):
         providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
         if not providers:
             logger.debug('no providers for interface {}'.format(interface))
-            del self.hosts[interface]
+            self.hosts[interface] = []
             return
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
 
@@ -186,8 +186,7 @@ class ZkRegister(object):
                 conf[configurator['host']] = configurator['fields'].get('weight', 100)
             self.weights[interface] = conf
         else:
-            # 没有权重配置则意味着此配置可以被删除
-            del self.weights[interface]
+            self.weights[interface] = {}
 
     def _register_consumer(self, providers):
         """
@@ -230,8 +229,10 @@ class ZkRegister(object):
         :return:
         """
         hosts = self.hosts[interface]
+        if not hosts:
+            raise RegisterException('no providers for interface {}'.format(interface))
         # 此接口没有权重设置，使用朴素的路由算法
-        if interface not in self.weights:
+        if interface not in self.weights or not self.weights[interface]:
             return random.choice(hosts)
 
         weights = self.weights[interface]
@@ -244,7 +245,7 @@ class ZkRegister(object):
             if hit <= sum(hosts_weight[:i + 1]):
                 return hosts[i]
 
-        raise RegisterException('error for finding [{}] host with weight.'.format(interface))
+        raise RegisterException('Error for finding [{}] host with weight.'.format(interface))
 
     def close(self):
         self.zk.stop()
