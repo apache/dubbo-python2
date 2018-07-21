@@ -177,6 +177,8 @@ class BaseConnectionPool(object):
             msg_id = data[4:12]
             heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
             conn.send(bytearray(heartbeat_response))
+            if body_length > 0:
+                return body_length, 3, None
             # 下一次继续读取新的头部数据
             return DEFAULT_READ_PARAMS
         # 远程主机发送的心跳响应数据包
@@ -200,6 +202,10 @@ class BaseConnectionPool(object):
         :param body:
         :return:
         """
+        # 没有invoke_id则意味着这是心跳的响应体，无需处理
+        if not invoke_id:
+            return
+
         try:
             res = Response(body)
             flag = res.read_int()
