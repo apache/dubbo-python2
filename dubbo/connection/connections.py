@@ -136,8 +136,7 @@ class BaseConnectionPool(object):
             self._delete_connection(conn)
             return 0, 0, 0
 
-        if invoke_id is not None:
-            logger.info('Data has been received for request id {}'.format(invoke_id))
+        logger.info('Data has been received in head with invoke id {}'.format(unpack('!q', data[4:12])[0]))
 
         if data_type == 1:
             return self._parse_head(data, conn)
@@ -270,6 +269,7 @@ class BaseConnectionPool(object):
             invoke_id = list(bytearray(pack('!q', get_invoke_id())))
             req = CLI_HEARTBEAT_REQ_HEAD + invoke_id + CLI_HEARTBEAT_TAIL
             conn.send(bytearray(req))
+            logger.info('Head has been send for request id {}'.format(invoke_id))
 
 
 class SelectConnectionPool(BaseConnectionPool):
