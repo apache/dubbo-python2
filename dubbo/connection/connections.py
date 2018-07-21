@@ -53,16 +53,12 @@ class BaseConnectionPool(object):
         event = threading.Event()
         self.conn_events[invoke_id] = event
         # 发送数据
+        logger.debug('Request has been send for request id {}'.format(invoke_id))
         conn.send(request_data)
-        logger.info('Data has been send for request id {}'.format(invoke_id))
-
-        start = time.time()
         event.wait(timeout)
-        end = time.time()
         del self.conn_events[invoke_id]
 
         if invoke_id not in self.results:
-            logger.warn('timeout is {} and programming waited {}'.format(timeout, end - start))
             err = "Socket(host='{}'): Read timed out. (read timeout={})".format(host, timeout)
             raise DubboRequestTimeoutException(err)
 
@@ -136,22 +132,23 @@ class BaseConnectionPool(object):
             self._delete_connection(conn)
             return 0, 0, 0
 
-        logger.info('data type {} and invoke id {}'.format(data_type, invoke_id))
+        logger.debug('Receive data type {} and invoke id {}'.format(data_type, invoke_id))
+        # 响应的头部
         if data_type == 1:
-            logger.info('Head has been received in head with invoke id {}'.format(unpack('!q', data[4:12])[0]))
+            logger.debug('Head has been received with invoke id {}'.format(unpack('!q', data[4:12])[0]))
             return self._parse_head(data, conn)
+        # 错误的响应体
         elif data_type == 2:
             res = Response(data)
             error = res.read_next()
-
             self.results[invoke_id] = DubboResponseException('\n{}'.format(error))
             self.conn_events[invoke_id].set()
-            # 下一次继续读取新的头部数据
             return DEFAULT_READ_PARAMS
+        # 正常的响应体
         elif data_type == 3:
             self._parse_response(invoke_id, data)
-            # 下一次继续读取新的头部数据
             return DEFAULT_READ_PARAMS
+
         else:
             raise RuntimeError('Unknown data type {}.'.format(data_type))
 
@@ -167,34 +164,24 @@ class BaseConnectionPool(object):
         except DubboResponseException as e:  # 这里是dubbo的内部异常，与response中的业务异常不一样
             logger.exception(e)
             body_length = unpack('!i', data[12:])[0]
-            # 获取响应的invoke_id
             invoke_id = unpack('!q', data[4:12])[0]
-            # 下一次需要读取错误的响应体
             return body_length, 2, invoke_id
-        # 远程主机发送的心跳请求数据包
+
         if heartbeat == 2:
             logger.debug('❤ request  -> {}'.format(conn.remote_host()))
             msg_id = data[4:12]
             heartbeat_response = CLI_HEARTBEAT_RES_HEAD + list(msg_id) + CLI_HEARTBEAT_TAIL
             conn.send(bytearray(heartbeat_response))
-            if body_length > 0:
-                return body_length, 3, None
-            # 下一次继续读取新的头部数据
-            return DEFAULT_READ_PARAMS
-        # 远程主机发送的心跳响应数据包
+            return body_length, 3, None if body_length > 0 else DEFAULT_READ_PARAMS
         elif heartbeat == 1:
             logger.debug('❤ response -> {}'.format(conn.remote_host()))
             host = conn.remote_host()
             self.client_heartbeats[host] -= 1
-            if body_length > 0:
-                return body_length, 3, None
-            # 下一次继续读取新的头部数据
-            return DEFAULT_READ_PARAMS
+            return body_length, 3, None if body_length > 0 else DEFAULT_READ_PARAMS
+
         # 普通的数据包
         else:
-            # 获取响应的invoke_id
             invoke_id = unpack('!q', data[4:12])[0]
-            # 下一次读取正常的响应体
             return body_length, 3, invoke_id
 
     def _parse_response(self, invoke_id, body):
@@ -204,7 +191,7 @@ class BaseConnectionPool(object):
         :param body:
         :return:
         """
-        # 没有invoke_id则意味着这是心跳的响应体，无需处理
+        # invoke_id为None则意味着这是心跳的数据体，无需处理
         if invoke_id is None:
             return
 
@@ -277,7 +264,7 @@ class BaseConnectionPool(object):
             invoke_id = list(bytearray(pack('!q', get_invoke_id())))
             req = CLI_HEARTBEAT_REQ_HEAD + invoke_id + CLI_HEARTBEAT_TAIL
             conn.send(bytearray(req))
-            logger.info('Head has been send for request id {}'.format(invoke_id))
+            logger.debug('Head has been send for request id {}'.format(invoke_id))
 
 
 class SelectConnectionPool(BaseConnectionPool):

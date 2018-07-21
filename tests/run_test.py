@@ -25,7 +25,6 @@ class TestDubbo(unittest.TestCase):
         })
         result = dubbo_cli.call('query', goods_query_request)
         pretty_print(result)
-        time.sleep(1000000)
 
     @unittest.skip('skip not important test')
     def test_run(self):
