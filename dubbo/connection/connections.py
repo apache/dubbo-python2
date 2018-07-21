@@ -186,6 +186,8 @@ class BaseConnectionPool(object):
             logger.debug('❤ response -> {}'.format(conn.remote_host()))
             host = conn.remote_host()
             self.client_heartbeats[host] -= 1
+            if body_length > 0:
+                return body_length, 3, None
             # 下一次继续读取新的头部数据
             return DEFAULT_READ_PARAMS
         # 普通的数据包
