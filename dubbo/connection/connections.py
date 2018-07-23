@@ -128,7 +128,7 @@ class BaseConnectionPool(object):
         host = conn.remote_host()
         # 关闭连接
         if not data:
-            logger.debug('{} closed by remote server'.format(host))
+            logger.debug('{} closed by remote server.'.format(host))
             self._delete_connection(conn)
             return 0, 0, 0
 
@@ -237,7 +237,10 @@ class BaseConnectionPool(object):
         while 1:
             starting = time.time()
             for host in self._connection_pool.keys():
-                self._check_conn(host)
+                try:
+                    self._check_conn(host)
+                except Exception as e:
+                    logger.exception(e)
             ending = time.time()
             time_delta = ending - starting
             if time_delta < TIMEOUT_CHECK_INTERVAL:
@@ -254,11 +257,13 @@ class BaseConnectionPool(object):
         if time.time() - conn.last_active <= TIMEOUT_IDLE:
             return
 
-        # 达到最大的超时次数，移除此连接
+        # 达到最大的超时次数，对此连接进行重连
         if self.client_heartbeats[host] >= TIMEOUT_MAX_TIMES:
-            self._delete_connection(conn)
-            conn.close()  # 客户端主动关闭连接
-            logger.debug('{} closed by client'.format(host))
+            self._new_connection(host)
+            self.client_heartbeats[host] = 0
+            logger.debug('{} timeout and reconnected by client'.format(host))
+            # 关闭旧的连接
+            conn.close()
 
         # 未达到最大的超时次数，超时次数+1且发送心跳包
         else:
