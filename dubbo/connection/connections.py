@@ -53,8 +53,8 @@ class BaseConnectionPool(object):
         event = threading.Event()
         self.conn_events[invoke_id] = event
         # 发送数据
-        logger.debug('Request has been send for request id {}'.format(invoke_id))
         conn.write(request_data)
+        logger.debug('Waiting response, invoke_id={}, timeout={}, host={}'.format(invoke_id, timeout, host))
         event.wait(timeout)
         del self.conn_events[invoke_id]
 
@@ -125,20 +125,20 @@ class BaseConnectionPool(object):
             next_read_type   下一次读取需要读取的数据类型
             invoke_id        此次调用的id
         """
+        host = conn.remote_host()
         # 关闭连接
         if not data:
-            host = conn.remote_host()
             logger.debug('{} closed by remote server'.format(host))
             self._delete_connection(conn)
             return 0, 0, 0
 
-        logger.debug('Receive data type {} and invoke id {}'.format(data_type, invoke_id))
         # 响应的头部
         if data_type == 1:
-            logger.debug('Head has been received with invoke id {}'.format(unpack('!q', data[4:12])[0]))
+            logger.debug('received response head with invoke_id={}, host={}'.format(unpack('!q', data[4:12])[0], host))
             return self._parse_head(data, conn)
         # 错误的响应体
         elif data_type == 2:
+            logger.debug('received error response body with invoke_id={}, host={}'.format(invoke_id, host))
             res = Response(data)
             error = res.read_next()
             self.results[invoke_id] = DubboResponseException('\n{}'.format(error))
@@ -146,6 +146,7 @@ class BaseConnectionPool(object):
             return DEFAULT_READ_PARAMS
         # 正常的响应体
         elif data_type == 3:
+            logger.debug('received normal response body with invoke_id={}, host={}'.format(invoke_id, host))
             self._parse_response(invoke_id, data)
             return DEFAULT_READ_PARAMS
 
@@ -212,6 +213,7 @@ class BaseConnectionPool(object):
             self.results[invoke_id] = e
         finally:
             self.conn_events[invoke_id].set()  # 唤醒请求线程
+            logger.debug('Event set, invoked_id={}'.format(invoke_id))
 
     @staticmethod
     def _parse_error(res):
@@ -261,10 +263,10 @@ class BaseConnectionPool(object):
         # 未达到最大的超时次数，超时次数+1且发送心跳包
         else:
             self.client_heartbeats[host] += 1
-            invoke_id = list(bytearray(pack('!q', get_invoke_id())))
-            req = CLI_HEARTBEAT_REQ_HEAD + invoke_id + CLI_HEARTBEAT_TAIL
+            invoke_id = get_invoke_id()
+            req = CLI_HEARTBEAT_REQ_HEAD + list(bytearray(pack('!q', invoke_id))) + CLI_HEARTBEAT_TAIL
             conn.write(bytearray(req))
-            logger.debug('Head has been send for request id {}'.format(invoke_id))
+            logger.debug('Send ❤ request for invoke_id {}, host={}'.format(invoke_id, host))
 
 
 class SelectConnectionPool(BaseConnectionPool):

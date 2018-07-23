@@ -31,6 +31,8 @@ class DubboClient(object):
         if not zk_register and not host:
             raise RegisterException('zk_register和host至少需要填入一个')
 
+        logger.debug('Created client, interface={}, version={}'.format(interface, version))
+
         self.__interface = interface
         self.__version = version
         self.__dubbo_version = dubbo_version
@@ -73,8 +75,14 @@ class DubboClient(object):
             'method': method,
             'arguments': args
         }
-        # logger.debug(request_param)
+
+        logger.debug('Start request, host={}, params={}'.format(host, request_param))
+        start_time = time.time()
         result = connection_pool.get(host, request_param, timeout)
+        cost_time = int((time.time() - start_time) * 1000)
+        logger.debug('Finish request, host={}, params={}'.format(host, request_param))
+        logger.debug('Request invoked, host={}, params={}, result={}, cost={}ms, timeout={}s'.format(
+            host, request_param, result, cost_time, timeout))
         return result
 
 
@@ -159,13 +167,13 @@ class ZkRegister(object):
         interface = path.split('/')[2]
 
         providers = self.zk.get_children(path, watch=self._watch_children)
-        logger.debug('{} providers: {}'.format(interface, providers))
         providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
         if not providers:
             logger.debug('no providers for interface {}'.format(interface))
             self.hosts[interface] = []
             return
         self.hosts[interface] = map(lambda provider: provider['host'], providers)
+        logger.debug('{} providers: {}'.format(interface, self.hosts[interface]))
 
     def _watch_configurators(self, event):
         """
@@ -184,8 +192,10 @@ class ZkRegister(object):
             conf = {}
             for configurator in configurators:
                 conf[configurator['host']] = configurator['fields'].get('weight', 100)
+            logger.debug('{} configurators: {}'.format(interface, conf))
             self.weights[interface] = conf
         else:
+            logger.debug('No configurator for interface {}')
             self.weights[interface] = {}
 
     def _register_consumer(self, providers):
@@ -218,6 +228,7 @@ class ZkRegister(object):
             params.append('{0}={1}'.format(key, value))
         consumer += '&'.join(params)
 
+        logger.debug('Create consumer {}'.format(fields))
         consumer_path = DUBBO_ZK_CONSUMERS.format(fields['interface'])
         self.zk.ensure_path(consumer_path)
         self.zk.create_async(consumer_path + '/' + quote(consumer, safe=''), ephemeral=True)

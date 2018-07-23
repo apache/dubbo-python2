@@ -6,6 +6,10 @@ import threading
 from sys import platform, maxsize
 from urlparse import urlparse, unquote, parse_qsl
 
+import logging
+
+logger = logging.getLogger('dubbo')
+
 ip = None
 heartbeat_id = 0
 invoke_id = 0
@@ -59,6 +63,7 @@ def get_ip():
     try:
         sock.connect(('8.8.8.8', 80))
         ip = sock.getsockname()[0]
+        logger.debug('Current IP Address: {}'.format(ip))
     finally:
         sock.close()
     return ip
