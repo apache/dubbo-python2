@@ -12,7 +12,7 @@ from dubbo.common.exceptions import RegisterException
 from dubbo.common.util import parse_url, get_pid, get_ip
 from dubbo.connection.connections import connection_pool
 
-logger = logging.getLogger('dubbo')
+logger = logging.getLogger('python-dubbo')
 
 
 class DubboClient(object):

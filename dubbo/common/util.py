@@ -8,7 +8,7 @@ from urlparse import urlparse, unquote, parse_qsl
 
 import logging
 
-logger = logging.getLogger('dubbo')
+logger = logging.getLogger('python-dubbo')
 
 ip = None
 heartbeat_id = 0

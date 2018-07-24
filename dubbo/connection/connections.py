@@ -13,7 +13,7 @@ from dubbo.common.constants import CLI_HEARTBEAT_RES_HEAD, CLI_HEARTBEAT_TAIL, C
 from dubbo.common.exceptions import DubboResponseException, DubboRequestTimeoutException
 from dubbo.common.util import get_invoke_id
 
-logger = logging.getLogger('dubbo')
+logger = logging.getLogger('python-dubbo')
 
 
 class BaseConnectionPool(object):
@@ -65,6 +65,7 @@ class BaseConnectionPool(object):
         result = self.results.pop(invoke_id)
         if isinstance(result, Exception):
             logger.exception(result)
+            logger.error('Exception {} for host {}'.format(result, host))
             raise result
         return result
 
@@ -261,9 +262,8 @@ class BaseConnectionPool(object):
         if self.client_heartbeats[host] >= TIMEOUT_MAX_TIMES:
             self._new_connection(host)
             self.client_heartbeats[host] = 0
-            logger.debug('{} timeout and reconnected by client'.format(host))
-            # 关闭旧的连接
-            conn.close()
+            conn.close()  # 关闭旧的连接
+            logger.debug('{} timeout and reconnected by client.'.format(host))
 
         # 未达到最大的超时次数，超时次数+1且发送心跳包
         else:
@@ -382,6 +382,7 @@ class Connection(object):
         关闭连接
         :return:
         """
+        logger.debug('{} closed by client.'.format(self.__host))
         self.__sock.shutdown(socket.SHUT_RDWR)
         self.__sock.close()
 
