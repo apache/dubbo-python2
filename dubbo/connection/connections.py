@@ -292,7 +292,10 @@ class SelectConnectionPool(BaseConnectionPool):
                 logger.exception(e)
                 break
             for conn in readable:
-                conn.read(self._callback)
+                try:
+                    conn.read(self._callback)
+                except Exception as e:
+                    logger.exception(e)
 
     def _new_connection(self, host):
         ip, port = host.split(':')
