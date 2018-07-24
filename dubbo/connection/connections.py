@@ -342,8 +342,19 @@ class Connection(object):
         向远程主机写数据
         :return:
         """
-        # TODO 这里有可能存在一次无法发送完毕的情况
-        self.__sock.send(data)
+        while 1:
+            try:
+                length = self.__sock.send(data)
+                if length == len(data):
+                    break
+                else:
+                    # 截取尚未写完的数据，接下来再次发送
+                    data = data[length:]
+            except socket.error as e:
+                if e.errno == 35:
+                    time.sleep(.01)
+                else:
+                    raise
 
     def read(self, callback):
         """
