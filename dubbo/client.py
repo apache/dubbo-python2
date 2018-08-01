@@ -177,6 +177,7 @@ class ZkRegister(object):
         :return:
         """
         path = event.path
+        logger.debug('zookeeper node changed: {}'.format(path))
         interface = path.split('/')[2]
 
         providers = self.zk.get_children(path, watch=self._watch_children)
@@ -195,6 +196,7 @@ class ZkRegister(object):
         :return:
         """
         path = event.path
+        logger.debug('zookeeper node changed: {}'.format(path))
         interface = path.split('/')[2]
 
         # 试图从配置中取出权重相关的信息
