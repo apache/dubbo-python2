@@ -318,6 +318,7 @@ class Connection(object):
 
     def __init__(self, host, port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
         sock.connect((host, port))
         # 在创建好连接之后设置IO为非阻塞
         sock.setblocking(False)
