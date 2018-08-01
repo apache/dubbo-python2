@@ -6,6 +6,7 @@ import random
 from urllib import quote
 
 from kazoo.client import KazooClient
+from kazoo.protocol.states import KazooState
 
 from dubbo.common.constants import DUBBO_ZK_PROVIDERS, DUBBO_ZK_CONFIGURATORS, DUBBO_ZK_CONSUMERS
 from dubbo.common.exceptions import RegisterException
@@ -101,6 +102,8 @@ class ZkRegister(object):
         :param application_name: 当前客户端的名称
         """
         zk = KazooClient(hosts=hosts)
+        # 对zookeeper连接状态的监控
+        zk.add_listener(self.state_listener)
         zk.start()
 
         self.zk = zk
@@ -108,6 +111,16 @@ class ZkRegister(object):
         self.weights = {}
         self.application_name = application_name
         self.lock = threading.Lock()
+
+    @staticmethod
+    def state_listener(state):
+        logger.debug('Current state -> {}'.format(state))
+        if state == KazooState.LOST:
+            logger.debug('The session to register has lost.')
+        elif state == KazooState.SUSPENDED:
+            logger.debug('Disconnected from zookeeper.')
+        else:
+            logger.debug('Connected or disconnected to zookeeper.')
 
     def get_provider_host(self, interface):
         """
