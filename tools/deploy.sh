@@ -13,7 +13,7 @@ echo "version: ${version}"
 echo "Adding git tag ${version}"
 git tag ${version}
 # 如果在创建tag的时候发生了错误就立即返回
-if [ $? -ne 0 ]; then exit $?; fi
+if [[ $? -ne 0 ]]; then exit $?; fi
 
 remotes_raw=`git remote`
 remotes=(${remotes_raw//\\n/ })
