@@ -22,7 +22,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='python-dubbo',
-    version='0.0.4',
+    version='0.0.5',
     url='https://github.com/RitterHou/python-dubbo',
     author='hourui',
     author_email='hourui@qianmi.com',

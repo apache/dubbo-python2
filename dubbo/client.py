@@ -131,8 +131,12 @@ class ZkRegister(object):
         self.application_name = application_name
         self.lock = threading.Lock()
 
-    @staticmethod
-    def state_listener(state):
+    def state_listener(self, state):
+        """
+        监听应用和Zookeeper之间的连接状态
+        :param state:
+        :return:
+        """
         logger.debug('Current state -> {}'.format(state))
         if state == KazooState.LOST:
             logger.debug('The session to register has lost.')
@@ -140,6 +144,19 @@ class ZkRegister(object):
             logger.debug('Disconnected from zookeeper.')
         else:
             logger.debug('Connected or disconnected to zookeeper.')
+
+            # 在新的线程里面进行重新订阅以防止死锁
+            t = threading.Thread(target=self.__resubscribe)
+            t.start()
+
+    def __resubscribe(self):
+        """
+        由于与Zookeeper的连接断开，所以需要重新订阅消息
+        :return:
+        """
+        for interface in self.hosts.keys():
+            self.zk.get_children(DUBBO_ZK_PROVIDERS.format(interface), watch=self._watch_children)
+            self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface), watch=self._watch_configurators)
 
     def get_provider_host(self, interface):
         """
