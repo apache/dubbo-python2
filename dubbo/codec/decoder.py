@@ -185,20 +185,20 @@ class Response(object):
         :return:
         """
         value = u''
-        for i in xrange(length):
+        for i in range(length):
             ch = self.read_byte()
             if ch < 0x80:
-                value += unichr(ch)
+                value += chr(ch)
             elif (ch & 0xe0) == 0xc0:
                 ch1 = self.read_byte()
-                value += unichr(((ch & 0x1f) << 6) + (ch1 & 0x3f))
+                value += chr(((ch & 0x1f) << 6) + (ch1 & 0x3f))
             elif (ch & 0xf0) == 0xe0:
                 ch1 = self.read_byte()
                 ch2 = self.read_byte()
-                value += unichr(((ch & 0x0f) << 12) + ((ch1 & 0x3f) << 6) + (ch2 & 0x3f))
+                value += chr(((ch & 0x0f) << 12) + ((ch1 & 0x3f) << 6) + (ch2 & 0x3f))
             else:
                 raise ValueError('Can\'t parse utf-8 char {}'.format(ch))
-        return value.encode('utf-8')  # 将unicode转化为str类型
+        return value
 
     @ranges((0x00, 0x1f), (0x30, 0x33), 0x52, ord('S'))
     def read_string(self):
@@ -263,7 +263,7 @@ class Response(object):
 
         field_length = self.read_int()
         field_names = []
-        for i in xrange(field_length):
+        for i in range(field_length):
             field_names.append(self.read_string())
         self.field_names.append(field_names)
         return self.read_object()
@@ -295,23 +295,23 @@ class Response(object):
         if 0x70 <= value <= 0x77:
             _type = self.read_type()  # type对于Python来说没有用处
             length = value - 0x70
-            for i in xrange(length):
+            for i in range(length):
                 result.append(self.read_next())
         # 固定长度的无类型短小列表
         elif 0x78 <= value <= 0x7f:
             length = value - 0x78
-            for i in xrange(length):
+            for i in range(length):
                 result.append(self.read_next())
         # 固定长度的有类型列表
         elif value == 0x56:
             _type = self.read_type()
             length = self.read_int()
-            for i in xrange(length):
+            for i in range(length):
                 result.append(self.read_next())
         # 固定长度的无类型列表
         elif value == 0x58:
             length = self.read_int()
-            for i in xrange(length):
+            for i in range(length):
                 result.append(self.read_next())
         # 可变长度的有类型列表
         elif value == 0x55:
@@ -423,7 +423,7 @@ class Response(object):
 
         field_length = self.read_int()
         field_names = []
-        for i in xrange(field_length):
+        for i in range(field_length):
             field_names.append(self.read_string())
         self.field_names.append(field_names)
 

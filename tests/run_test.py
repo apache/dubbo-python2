@@ -49,17 +49,17 @@ class TestDubbo(unittest.TestCase):
     def test_run(self):
         zk = ZkRegister('127.0.0.1:2181')
         dubbo_cli = DubboClient('me.hourui.echo.provider.Echo', zk_register=zk)
-        for i in xrange(4):
+        for i in range(4):
             thread = threading.Thread(target=run, args=(dubbo_cli,))
             thread.start()
 
 
 def pretty_print(value):
-    print json.dumps(value, ensure_ascii=False, indent=4, sort_keys=True)
+    print(json.dumps(value, ensure_ascii=False, indent=4, sort_keys=True))
 
 
 def run(_dubbo):
-    for j in xrange(1000):
+    for j in range(1000):
         _dubbo.call('echo18')
 
 
