@@ -120,16 +120,17 @@ class ZkRegister(object):
         :param hosts: Zookeeper的地址
         :param application_name: 当前客户端的名称
         """
+        self.hosts = {}
+        self.weights = {}
+        self.application_name = application_name
+        self.lock = threading.Lock()
+
         zk = KazooClient(hosts=hosts)
         # 对zookeeper连接状态的监控
         zk.add_listener(self.state_listener)
         zk.start()
 
         self.zk = zk
-        self.hosts = {}
-        self.weights = {}
-        self.application_name = application_name
-        self.lock = threading.Lock()
 
     def state_listener(self, state):
         """
@@ -145,10 +146,9 @@ class ZkRegister(object):
         else:
             logger.debug('Connected or disconnected to zookeeper.')
 
-            # TODO
             # 在新的线程里面进行重新订阅以防止死锁
-            # t = threading.Thread(target=self.__resubscribe)
-            # t.start()
+            t = threading.Thread(target=self.__resubscribe)
+            t.start()
 
     def __resubscribe(self):
         """
