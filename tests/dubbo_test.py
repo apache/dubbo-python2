@@ -129,13 +129,13 @@ class TestDubbo(unittest.TestCase):
 
     # @unittest.skip('skip performance test')
     def test_multi_threading(self):
-        for i in xrange(10):
+        for i in range(10):
             thread = threading.Thread(target=self._run_num)
             thread.start()
 
     # @unittest.skip('skip performance test')
     def test_performance(self):
-        for i in xrange(10):
+        for i in range(10):
             self.dubbo.call('echo18')
 
     def test_auto_rule(self):
@@ -265,15 +265,15 @@ class TestDubbo(unittest.TestCase):
         result = spu_query_provider.call('query', spu_query_request)
         # pretty_print(result)
         total = result['totalCount']
-        print total
-        print len(result['dataList'])
+        print(total)
+        print(len(result['dataList']))
 
         data_list = result['dataList']
         for data in data_list:
             spu_id = data['spuId']
             spu_desc_request = Object('com.qianmi.pc.item.api.spu.request.SpuDescriptionGetRequest')
             spu_desc_request['spuId'] = spu_id
-            print spu_id
+            print(spu_id)
             spu_desc_request['chainMasterId'] = 'A000000'
             pretty_print(spu_query_provider.call('getDescription', spu_desc_request))
 

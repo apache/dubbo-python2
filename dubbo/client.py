@@ -22,7 +22,7 @@ import logging
 import threading
 import time
 import random
-from urllib import quote
+from urllib.parse import quote
 
 from kazoo.client import KazooClient
 from kazoo.protocol.states import KazooState
@@ -120,16 +120,17 @@ class ZkRegister(object):
         :param hosts: Zookeeper的地址
         :param application_name: 当前客户端的名称
         """
+        self.hosts = {}
+        self.weights = {}
+        self.application_name = application_name
+        self.lock = threading.Lock()
+
         zk = KazooClient(hosts=hosts)
         # 对zookeeper连接状态的监控
         zk.add_listener(self.state_listener)
         zk.start()
 
         self.zk = zk
-        self.hosts = {}
-        self.weights = {}
-        self.application_name = application_name
-        self.lock = threading.Lock()
 
     def state_listener(self, state):
         """
@@ -186,11 +187,11 @@ class ZkRegister(object):
         :return:
         """
         providers = self.zk.get_children(path, watch=self._watch_children)
-        providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
+        providers = list(filter(lambda provider: provider['scheme'] == 'dubbo', list(map(parse_url, providers))))
         if not providers:
             raise RegisterException('no providers for interface {}'.format(interface))
         self._register_consumer(providers)
-        self.hosts[interface] = map(lambda provider: provider['host'], providers)
+        self.hosts[interface] = list(map(lambda provider: provider['host'], providers))
 
     def _get_configurators_from_zk(self, interface):
         """
@@ -200,7 +201,7 @@ class ZkRegister(object):
         """
         configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface), watch=self._watch_configurators)
         if configurators:
-            configurators = map(parse_url, configurators)
+            configurators = list(map(parse_url, configurators))
             conf = {}
             for configurator in configurators:
                 conf[configurator['host']] = configurator['fields'].get('weight', 100)  # 默认100
@@ -217,12 +218,12 @@ class ZkRegister(object):
         interface = path.split('/')[2]
 
         providers = self.zk.get_children(path, watch=self._watch_children)
-        providers = filter(lambda provider: provider['scheme'] == 'dubbo', map(parse_url, providers))
+        providers = list(filter(lambda provider: provider['scheme'] == 'dubbo', list(map(parse_url, providers))))
         if not providers:
             logger.debug('no providers for interface {}'.format(interface))
             self.hosts[interface] = []
             return
-        self.hosts[interface] = map(lambda provider: provider['host'], providers)
+        self.hosts[interface] = list(map(lambda provider: provider['host'], providers))
         logger.debug('{} providers: {}'.format(interface, self.hosts[interface]))
 
     def _watch_configurators(self, event):
@@ -239,7 +240,7 @@ class ZkRegister(object):
         configurators = self.zk.get_children(DUBBO_ZK_CONFIGURATORS.format(interface),
                                              watch=self._watch_configurators)
         if configurators:
-            configurators = map(parse_url, configurators)
+            configurators = list(map(parse_url, configurators))
             conf = {}
             for configurator in configurators:
                 conf[configurator['host']] = configurator['fields'].get('weight', 100)
@@ -303,7 +304,7 @@ class ZkRegister(object):
             hosts_weight.append(int(weights.get(host, 100)))
 
         hit = random.randint(0, sum(hosts_weight) - 1)
-        for i in xrange(len(hosts)):
+        for i in range(len(hosts)):
             if hit <= sum(hosts_weight[:i + 1]):
                 return hosts[i]
 
