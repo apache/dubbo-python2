@@ -273,7 +273,7 @@ class ZkRegister(object):
             'revision': provider_fields['revision'],
             'side': 'consumer',
             'timestamp': int(time.time() * 1000),
-            'version': provider_fields['version'],
+            'version': provider_fields.get('version'),
         }
 
         params = []
